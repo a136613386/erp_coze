@@ -33,18 +33,21 @@
 src/
 ├── app/
 │   ├── api/
-│   │   └── chat/
-│   │       └── route.ts      # AI 对话 API
+│   │   ├── chat/
+│   │   │   └── route.ts      # ERP AI 对话 API
+│   │   └── dify/
+│   │       └── route.ts      # Dify AI 对话 API
 │   ├── layout.tsx
-│   ├── page.tsx              # AI 对话界面
+│   ├── page.tsx              # ERP 管理页面
 │   └── globals.css
 ├── components/
-│   └── ui/                   # shadcn/ui 组件库
+│   ├── ui/                   # shadcn/ui 组件库
+│   └── DifyChat.tsx          # Dify 助手组件
 ├── lib/
 │   ├── types.ts              # TypeScript 类型定义
 │   ├── mockData.ts           # 模拟数据
 │   ├── businessQuery.ts      # 业务查询服务
-│   ├── intentRecognition.ts   # 意图识别服务
+│   ├── intentRecognition.ts  # 意图识别服务
 │   └── utils.ts              # 工具函数
 └── hooks/
     └── use-mobile.ts
@@ -62,7 +65,7 @@ src/
 
 ### POST /api/chat
 
-对话接口，用于 AI 助手处理用户查询。
+ERP智能助手对话接口，用于 AI 助手处理用户查询。
 
 **请求体:**
 ```json
@@ -79,6 +82,37 @@ src/
 - "查看库存情况" - 查询库存和预警
 - "生成经营报表" - 生成统计报表
 - "检查系统异常" - 检查库存不足和待收款
+
+### POST /api/dify
+
+Dify智能助手对话接口，用于接入外部Dify服务。
+
+**请求体:**
+```json
+{
+  "message": "你好",
+  "conversation_id": ""
+}
+```
+
+**配置项:**
+- `DIFY_API_URL` - Dify API地址（默认: https://api.dify.ai/v1/chat-messages）
+- `DIFY_API_KEY` - Dify API密钥（需要替换为实际值）
+
+## AI 双助手系统
+
+系统内置两个AI助手：
+
+### 1. ERP 智能助手（蓝色机器人图标）
+- 位置：右下角悬浮按钮
+- 功能：专业ERP业务查询（客户、订单、库存、财务）
+- 颜色：蓝紫渐变
+
+### 2. Dify 智能助手（橙色火箭图标）
+- 位置：右下角悬浮按钮（ERP上方）
+- 功能：通用AI对话（接入您的Dify应用）
+- 颜色：橙红渐变
+- 图标：火箭升空
 
 ## 数据模型
 

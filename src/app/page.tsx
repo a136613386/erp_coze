@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { 
   Users, ShoppingCart, Package, Wallet, BarChart3, 
   Settings, Bell, ChevronLeft, ChevronRight, Bot,
-  X, Send, RefreshCw, AlertCircle
+  X, Send, RefreshCw, AlertCircle, Rocket
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,6 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
+import DifyChat from '@/components/DifyChat';
 
 type TabType = 'customers' | 'orders' | 'inventory' | 'finance' | 'dashboard';
 
@@ -79,6 +80,7 @@ export default function ERPDashboard() {
   const [activeTab, setActiveTab] = useState<TabType>('dashboard');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
+  const [difyOpen, setDifyOpen] = useState(false);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
     {
       id: '1',
@@ -546,7 +548,7 @@ export default function ERPDashboard() {
         </div>
       </main>
 
-      {/* AI Chat Button */}
+      {/* AI Chat Button - ERP智能助手 */}
       <button
         onClick={() => setChatOpen(true)}
         className={cn(
@@ -556,6 +558,20 @@ export default function ERPDashboard() {
       >
         <Bot className="w-7 h-7" />
       </button>
+
+      {/* Dify Chat Button - 火箭图标 */}
+      <button
+        onClick={() => setDifyOpen(true)}
+        className={cn(
+          'fixed bottom-24 right-6 w-14 h-14 bg-gradient-to-br from-orange-500 to-red-500 rounded-full shadow-lg shadow-orange-500/30 flex items-center justify-center text-white hover:scale-110 transition-transform z-40',
+          difyOpen && 'hidden'
+        )}
+      >
+        <Rocket className="w-7 h-7" />
+      </button>
+
+      {/* Dify Chat Panel */}
+      {difyOpen && <DifyChat onClose={() => setDifyOpen(false)} />}
 
       {/* AI Chat Panel */}
       {chatOpen && (
