@@ -1,65 +1,113 @@
-# 项目上下文
+# ERP 智能助手 - 项目文档
 
-### 版本技术栈
+## 项目概述
 
-- **Framework**: Next.js 16 (App Router)
-- **Core**: React 19
-- **Language**: TypeScript 5
+面向小微企业的 ERP 教学演示系统，支持通过自然语言对话操作企业管理功能。
+
+## 技术栈
+
+- **框架**: Next.js 16 (App Router)
+- **核心**: React 19
+- **语言**: TypeScript 5
 - **UI 组件**: shadcn/ui (基于 Radix UI)
-- **Styling**: Tailwind CSS 4
+- **样式**: Tailwind CSS 4
+- **AI 能力**: LLM (coze-coding-dev-sdk)
+
+## 功能模块
+
+### 核心模块
+1. **客户管理 (CRM)** - 客户信息录入、查询、跟进记录
+2. **订单管理** - 订单创建、状态跟踪、发货记录
+3. **库存管理** - 商品入库、出库、库存查询
+4. **财务管理** - 收款、付款、简单报表
+
+### AI 助手能力
+- 查询客户、订单、库存信息
+- 生成简单的数据报表
+- 回答业务问题（如"本月销售额最高的客户是谁"）
+- 提醒异常情况（如库存不足提醒）
 
 ## 目录结构
 
 ```
-├── public/                 # 静态资源
-├── scripts/                # 构建与启动脚本
-│   ├── build.sh            # 构建脚本
-│   ├── dev.sh              # 开发环境启动脚本
-│   ├── prepare.sh          # 预处理脚本
-│   └── start.sh            # 生产环境启动脚本
-├── src/
-│   ├── app/                # 页面路由与布局
-│   ├── components/ui/      # Shadcn UI 组件库
-│   ├── hooks/              # 自定义 Hooks
-│   ├── lib/                # 工具库
-│   │   └── utils.ts        # 通用工具函数 (cn)
-│   └── server.ts           # 自定义服务端入口
-├── next.config.ts          # Next.js 配置
-├── package.json            # 项目依赖管理
-└── tsconfig.json           # TypeScript 配置
+src/
+├── app/
+│   ├── api/
+│   │   └── chat/
+│   │       └── route.ts      # AI 对话 API
+│   ├── layout.tsx
+│   ├── page.tsx              # AI 对话界面
+│   └── globals.css
+├── components/
+│   └── ui/                   # shadcn/ui 组件库
+├── lib/
+│   ├── types.ts              # TypeScript 类型定义
+│   ├── mockData.ts           # 模拟数据
+│   ├── businessQuery.ts      # 业务查询服务
+│   ├── intentRecognition.ts   # 意图识别服务
+│   └── utils.ts              # 工具函数
+└── hooks/
+    └── use-mobile.ts
 ```
 
-- 项目文件（如 app 目录、pages 目录、components 等）默认初始化到 `src/` 目录下。
+## 开发命令
 
-## 包管理规范
+- `pnpm install` - 安装依赖
+- `pnpm run dev` - 启动开发服务器
+- `pnpm run build` - 构建生产版本
+- `pnpm run lint` - 代码检查
+- `pnpm ts-check` - TypeScript 类型检查
 
-**仅允许使用 pnpm** 作为包管理器，**严禁使用 npm 或 yarn**。
-**常用命令**：
-- 安装依赖：`pnpm add <package>`
-- 安装开发依赖：`pnpm add -D <package>`
-- 安装所有依赖：`pnpm install`
-- 移除依赖：`pnpm remove <package>`
+## API 接口
 
-## 开发规范
+### POST /api/chat
 
-### 编码规范
+对话接口，用于 AI 助手处理用户查询。
 
-- 默认按 TypeScript `strict` 心智写代码；优先复用当前作用域已声明的变量、函数、类型和导入，禁止引用未声明标识符或拼错变量名。
-- 禁止隐式 `any` 和 `as any`；函数参数、返回值、解构项、事件对象、`catch` 错误在使用前应有明确类型或先完成类型收窄，并清理未使用的变量和导入。
+**请求体:**
+```json
+{
+  "message": "查看张三的订单"
+}
+```
 
-### next.config 配置规范
+**响应:** 流式文本响应
 
-- 配置的路径不要写死绝对路径，必须使用 path.resolve(__dirname, ...)、import.meta.dirname 或 process.cwd() 动态拼接。
+**示例查询:**
+- "查看客户列表" - 查询所有客户
+- "查看张三的订单" - 查询特定客户订单
+- "查看库存情况" - 查询库存和预警
+- "生成经营报表" - 生成统计报表
+- "检查系统异常" - 检查库存不足和待收款
 
-### Hydration 问题防范
+## 数据模型
 
-1. 严禁在 JSX 渲染逻辑中直接使用 typeof window、Date.now()、Math.random() 等动态数据。**必须使用 'use client' 并配合 useEffect + useState 确保动态内容仅在客户端挂载后渲染**；同时严禁非法 HTML 嵌套（如 <p> 嵌套 <div>）。
-2. **禁止使用 head 标签**，优先使用 metadata，详见文档：https://nextjs.org/docs/app/api-reference/functions/generate-metadata
-   1. 三方 CSS、字体等资源可在 `globals.css` 中顶部通过 `@import` 引入或使用 next/font
-   2. preload, preconnect, dns-prefetch 通过 ReactDOM 的 preload、preconnect、dns-prefetch 方法引入
-   3. json-ld 可阅读 https://nextjs.org/docs/app/guides/json-ld
+### 客户 (Customer)
+- id, name, phone, email, company, address, level, followRecords, createdAt
 
-## UI 设计与组件规范 (UI & Styling Standards)
+### 订单 (Order)
+- id, orderNo, customerId, customerName, items, totalAmount, status, createTime, deliveryTime, shippingAddress
 
-- 模板默认预装核心组件库 `shadcn/ui`，位于`src/components/ui/`目录下
-- Next.js 项目**必须默认**采用 shadcn/ui 组件、风格和规范，**除非用户指定用其他的组件和规范。**
+### 产品 (Product)
+- id, code, name, category, unit, stock, safeStock, price, cost
+
+### 财务记录 (FinanceRecord)
+- id, type, amount, customerId, supplierId, paymentMethod, status, time, remark
+
+## 意图识别
+
+系统支持以下业务意图:
+- `query_customer` - 查询客户信息
+- `query_order` - 查询订单信息
+- `query_inventory` - 查询库存信息
+- `query_finance` - 查询财务信息
+- `generate_report` - 生成经营报表
+- `anomaly_alert` - 系统异常提醒
+- `general_chat` - 闲聊/问候
+
+## 快速开始
+
+1. 安装依赖: `pnpm install`
+2. 启动开发服务器: `pnpm run dev`
+3. 访问 http://localhost:5000
+4. 开始使用 AI 助手查询企业管理数据
