@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { 
   Users, ShoppingCart, Package, Wallet, BarChart3, 
   Settings, Bell, ChevronLeft, ChevronRight, Bot,
@@ -12,6 +12,157 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
+
+// Dify 聊天机器人配置
+const DIFY_CONFIG = {
+  token: 'hAJowP9uMMG9PRxh',
+  baseUrl: 'http://localhost', // 替换为您的 Dify 地址
+};
+
+function DifyChatbot() {
+  const [isOpen, setIsOpen] = useState(false);
+  const [messages, setMessages] = useState<Array<{role: 'user' | 'assistant', content: string}>>([]);
+  const [input, setInput] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    // 加载 Dify 嵌入脚本
+    const script = document.createElement('script');
+    script.src = `${DIFY_CONFIG.baseUrl}/embed.min.js`;
+    script.id = 'dify-chatbot-script';
+    script.defer = true;
+    document.body.appendChild(script);
+
+    // 添加样式
+    const style = document.createElement('style');
+    style.textContent = `
+      #dify-chatbot-bubble-button {
+        background-color: #2c5282 !important;
+        bottom: 80px !important;
+        right: 20px !important;
+      }
+      #dify-chatbot-bubble-window {
+        bottom: 130px !important;
+        right: 20px !important;
+        width: 24rem !important;
+        height: 40rem !important;
+      }
+    `;
+    document.head.appendChild(style);
+
+    return () => {
+      document.body.removeChild(script);
+      document.head.removeChild(style);
+    };
+  }, []);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
+
+  const handleSend = async () => {
+    if (!input.trim() || isLoading) return;
+    
+    const userMessage = input.trim();
+    setInput('');
+    setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
+    setIsLoading(true);
+
+    try {
+      // 调用 Dify API
+      const response = await fetch(`${DIFY_CONFIG.baseUrl}/v1/chat-messages`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          query: userMessage,
+          user: 'anonymous',
+          response_mode: 'blocking',
+        }),
+      });
+
+      const data = await response.json();
+      setMessages(prev => [...prev, { role: 'assistant', content: data.answer || '抱歉，我没有收到回复。' }]);
+    } catch (error) {
+      setMessages(prev => [...prev, { role: 'assistant', content: '服务暂不可用，请稍后重试。' }]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <>
+      {/* 聊天按钮 */}
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="fixed bottom-6 right-6 w-14 h-14 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg flex items-center justify-center transition-all z-50"
+      >
+        {isOpen ? <X className="w-6 h-6" /> : <Bot className="w-6 h-6" />}
+      </button>
+
+      {/* 聊天窗口 */}
+      {isOpen && (
+        <div className="fixed bottom-24 right-6 w-96 h-[500px] bg-white rounded-xl shadow-2xl flex flex-col overflow-hidden z-50 border">
+          <div className="bg-blue-600 text-white px-4 py-3 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Bot className="w-5 h-5" />
+              <span className="font-semibold">智能客服</span>
+            </div>
+            <button onClick={() => setIsOpen(false)} className="hover:bg-blue-700 p-1 rounded">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+          
+          <ScrollArea className="flex-1 p-4">
+            <div className="space-y-4">
+              <div className="bg-gray-100 rounded-lg p-3 text-sm">
+                您好！我是智能客服，请问有什么可以帮助您的？
+              </div>
+              {messages.map((msg, i) => (
+                <div
+                  key={i}
+                  className={cn(
+                    'rounded-lg p-3 text-sm',
+                    msg.role === 'user' 
+                      ? 'bg-blue-600 text-white ml-12' 
+                      : 'bg-gray-100 mr-12'
+                  )}
+                >
+                  {msg.content}
+                </div>
+              ))}
+              {isLoading && (
+                <div className="bg-gray-100 rounded-lg p-3 text-sm animate-pulse">
+                  正在输入...
+                </div>
+              )}
+              <div ref={messagesEndRef} />
+            </div>
+          </ScrollArea>
+
+          <div className="p-3 border-t flex gap-2">
+            <Input
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+              placeholder="输入您的问题..."
+              disabled={isLoading}
+            />
+            <Button onClick={handleSend} disabled={isLoading} size="icon">
+              <Send className="w-4 h-4" />
+            </Button>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
 
 type TabType = 'customers' | 'orders' | 'inventory' | 'finance' | 'dashboard';
 
@@ -659,8 +810,11 @@ export default function ERPDashboard() {
               </div>
             </div>
           </div>
-        </div>
+          </div>
       )}
+
+      {/* Dify 智能客服 */}
+      <DifyChatbot />
     </div>
   );
 }
