@@ -1,26 +1,24 @@
-import { BusinessIntent, Order, Customer, Product } from './types';
+
+
+
+
 import {
   getAllCustomers,
-  getCustomerById,
-  searchCustomers,
+  getAllFinanceRecords,
   getAllOrders,
-  getOrdersByCustomerId,
-  searchOrders,
   getAllProducts,
   getLowStockProducts,
-  searchProducts,
-  getAllFinanceRecords,
-  getMonthlySales,
-  getMonthlyReceived,
   getMonthlyPaid,
-  getTopCustomerBySales,
+  getMonthlyReceived,
+  getMonthlySales,
+  getOrdersByCustomerId,
   getPendingPaymentOrders,
-  getAllSuppliers,
-  getStockRecords,
-  mockCustomers,
-  mockOrders,
-  mockProducts,
+  getTopCustomerBySales,
+  searchCustomers,
+  searchOrders,
+  searchProducts
 } from './mockData';
+import { BusinessIntent, Order, Product } from './types';
 
 // 业务查询服务
 export class BusinessQueryService {
