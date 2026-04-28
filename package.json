@@ -3,11 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "build": "bash ./scripts/build.sh",
-    "dev": "bash ./scripts/dev.sh",
+    "build": "node ./scripts/build.mjs",
+    "dev": "node ./scripts/dev.mjs",
     "preinstall": "npx only-allow pnpm",
     "lint": "eslint",
-    "start": "bash ./scripts/start.sh",
+    "start": "node ./scripts/start.mjs",
     "ts-check": "tsc -p tsconfig.json"
   },
   "dependencies": {

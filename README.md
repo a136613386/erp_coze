@@ -1,4 +1,5 @@
 # projects
+外网访问： https://d1c6f471-752b-440f-9b03-8019bc1ffed3.dev.coze.site
 
 这是一个基于 [Next.js 16](https://nextjs.org) + [shadcn/ui](https://ui.shadcn.com) 的全栈应用项目，由扣子编程 CLI 创建。
 
@@ -7,6 +8,9 @@
 ### 启动开发服务器
 
 ```bash
+推荐
+pnpm dev
+
 coze dev
 ```
 
