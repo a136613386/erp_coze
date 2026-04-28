@@ -98,6 +98,7 @@ Next.js 使用文件系统路由，在 `src/app/` 目录下创建文件夹即可
 
 ```bash
 # 创建新路由 /about
+
 src/app/about/page.tsx
 
 # 创建动态路由 /posts/[id]
