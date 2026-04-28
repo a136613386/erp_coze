@@ -1,7 +1,6 @@
 import type { Metadata } from 'next';
 import { Inspector } from 'react-dev-inspector';
 import './globals.css';
-
 export const metadata: Metadata = {
   title: {
     default: 'ERP 智能助手 | 小微企业管理系统',
