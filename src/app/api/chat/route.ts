@@ -3,8 +3,6 @@ import { Config, LLMClient, HeaderUtils } from 'coze-coding-dev-sdk';
 import { intentRecognition } from '@/lib/intentRecognition';
 import { queryService } from '@/lib/businessQuery';
 
-
-
 export const runtime = 'nodejs';
 
 export async function POST(request: NextRequest) {
