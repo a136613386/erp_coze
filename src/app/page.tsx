@@ -1,36 +1,43 @@
 'use client';
 
-import { useState } from 'react';
-import { 
-  Users, ShoppingCart, Package, Wallet, BarChart3, 
-  Settings, Bell, ChevronLeft, ChevronRight, Bot,
-  X, Send, RefreshCw, AlertCircle, Rocket
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  AlertCircle,
+  BarChart3,
+  Bell,
+  Bot,
+  ChevronLeft,
+  ChevronRight,
+  Package,
+  RefreshCw,
+  Rocket,
+  Send,
+  Settings,
+  ShoppingCart,
+  Users,
+  Wallet,
+  X,
 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { toast } from 'sonner';
+
+import AddCustomerDialog from '@/components/AddCustomerDialog';
+import DifyChat from '@/components/DifyChat';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
-import DifyChat from '@/components/DifyChat';
+import type { CreateCustomerInput, CustomerListItem } from '@/lib/customer-management';
 
 type TabType = 'customers' | 'orders' | 'inventory' | 'finance' | 'dashboard';
 
-interface ChatMessage {
+type ChatMessage = {
   id: string;
   role: 'user' | 'assistant';
   content: string;
   timestamp: string;
-}
-
-// 模拟数据
-const mockCustomers = [
-  { id: 'C001', name: '张三', company: '北京科技有限公司', phone: '13800138001', level: 'VIP', totalOrders: 2, totalAmount: 83000 },
-  { id: 'C002', name: '李四', company: '上海贸易集团', phone: '13800138002', level: '普通', totalOrders: 2, totalAmount: 21500 },
-  { id: 'C003', name: '王五', company: '广州制造业公司', phone: '13800138003', level: '新客户', totalOrders: 1, totalAmount: 40000 },
-  { id: 'C004', name: '赵六', company: '深圳电子科技', phone: '13800138004', level: 'VIP', totalOrders: 1, totalAmount: 65000 },
-  { id: 'C005', name: '孙七', company: '成都软件园', phone: '13800138005', level: '普通', totalOrders: 0, totalAmount: 0 },
-];
+};
 
 const mockOrders = [
   { id: 'ORD001', orderNo: 'ORD20240115001', customer: '张三', amount: 53000, status: '已完成', date: '2024-01-15', items: 2 },
@@ -50,8 +57,6 @@ const mockInventory = [
   { id: 'P006', name: '服务器', code: 'IT006', stock: 5, safeStock: 2, price: 25000, unit: '台', status: 'normal' },
   { id: 'P007', name: '网络交换机', code: 'IT007', stock: 15, safeStock: 5, price: 3000, unit: '台', status: 'normal' },
   { id: 'P008', name: '固态硬盘', code: 'IT008', stock: 3, safeStock: 15, price: 800, unit: '个', status: 'low' },
-  { id: 'P009', name: '投影仪', code: 'IT009', stock: 6, safeStock: 3, price: 4500, unit: '台', status: 'normal' },
-  { id: 'P010', name: 'UPS电源', code: 'IT010', stock: 10, safeStock: 4, price: 2200, unit: '台', status: 'normal' },
 ];
 
 const mockFinance = [
@@ -63,55 +68,129 @@ const mockFinance = [
 ];
 
 const statusColors: Record<string, string> = {
-  'VIP': 'bg-purple-100 text-purple-700',
-  '普通': 'bg-blue-100 text-blue-700',
-  '新客户': 'bg-green-100 text-green-700',
-  '已完成': 'bg-green-100 text-green-700',
-  '已发货': 'bg-blue-100 text-blue-700',
-  '待付款': 'bg-yellow-100 text-yellow-700',
-  '已付款': 'bg-green-100 text-green-700',
-  '已取消': 'bg-gray-100 text-gray-700',
-  '已确认': 'bg-green-100 text-green-700',
-  'low': 'bg-red-100 text-red-700',
-  'normal': 'bg-green-100 text-green-700',
+  VIP: 'bg-purple-100 text-purple-700',
+  普通: 'bg-blue-100 text-blue-700',
+  新客户: 'bg-green-100 text-green-700',
+  已完成: 'bg-green-100 text-green-700',
+  已发货: 'bg-blue-100 text-blue-700',
+  待付款: 'bg-yellow-100 text-yellow-700',
+  已付款: 'bg-emerald-100 text-emerald-700',
+  已取消: 'bg-slate-100 text-slate-700',
+  已确认: 'bg-green-100 text-green-700',
+  low: 'bg-red-100 text-red-700',
+  normal: 'bg-green-100 text-green-700',
 };
+
+const navItems = [
+  { id: 'dashboard', label: '经营概览', icon: BarChart3 },
+  { id: 'customers', label: '客户管理', icon: Users },
+  { id: 'orders', label: '订单管理', icon: ShoppingCart },
+  { id: 'inventory', label: '库存管理', icon: Package },
+  { id: 'finance', label: '财务管理', icon: Wallet },
+] as const;
+
+async function parseErrorMessage(response: Response) {
+  try {
+    const data = await response.json();
+    return typeof data?.message === 'string' ? data.message : '请求失败，请稍后重试';
+  } catch {
+    return '请求失败，请稍后重试';
+  }
+}
 
 export default function ERPDashboard() {
   const [activeTab, setActiveTab] = useState<TabType>('dashboard');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   const [difyOpen, setDifyOpen] = useState(false);
+  const [chatInput, setChatInput] = useState('');
+  const [chatLoading, setChatLoading] = useState(false);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
     {
       id: '1',
       role: 'assistant',
-      content: '您好！我是ERP智能助手，可以帮您查询客户、订单、库存、财务等信息，也可以帮您生成经营报表或检查异常情况。',
+      content: '您好，我是 ERP 智能助手，可以帮您查询客户、订单、库存、财务，并生成简单经营报表。',
       timestamp: new Date().toISOString(),
     },
   ]);
-  const [chatInput, setChatInput] = useState('');
-  const [chatLoading, setChatLoading] = useState(false);
+  const [customers, setCustomers] = useState<CustomerListItem[]>([]);
+  const [customerLoading, setCustomerLoading] = useState(true);
+  const [customerDialogOpen, setCustomerDialogOpen] = useState(false);
+  const [creatingCustomer, setCreatingCustomer] = useState(false);
 
-  const navItems = [
-    { id: 'dashboard', label: '经营概览', icon: BarChart3 },
-    { id: 'customers', label: '客户管理', icon: Users },
-    { id: 'orders', label: '订单管理', icon: ShoppingCart },
-    { id: 'inventory', label: '库存管理', icon: Package },
-    { id: 'finance', label: '财务管理', icon: Wallet },
-  ];
+  const lowStockCount = mockInventory.filter((product) => product.status === 'low').length;
+  const pendingPaymentCount = mockOrders.filter((order) => order.status === '待付款').length;
 
-  const handleChat = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!chatInput.trim() || chatLoading) return;
+  const monthlySales = useMemo(
+    () => mockOrders.reduce((total, order) => total + order.amount, 0),
+    []
+  );
+
+  const loadCustomers = useCallback(async (showErrorToast = true) => {
+    try {
+      setCustomerLoading(true);
+
+      const response = await fetch('/api/customers', { cache: 'no-store' });
+      if (!response.ok) {
+        throw new Error(await parseErrorMessage(response));
+      }
+
+      const data = (await response.json()) as { customers: CustomerListItem[] };
+      setCustomers(data.customers);
+    } catch (error) {
+      if (showErrorToast) {
+        toast.error(error instanceof Error ? error.message : '客户列表加载失败');
+      }
+    } finally {
+      setCustomerLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadCustomers();
+  }, [loadCustomers]);
+
+  const handleCreateCustomer = async (values: CreateCustomerInput) => {
+    try {
+      setCreatingCustomer(true);
+
+      const response = await fetch('/api/customers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(values),
+      });
+
+      if (!response.ok) {
+        const message = await parseErrorMessage(response);
+        toast.error(message);
+        return false;
+      }
+
+      await loadCustomers(false);
+      setCustomerDialogOpen(false);
+      toast.success('添加成功');
+      return true;
+    } catch {
+      toast.error('网络异常，请检查连接后重试');
+      return false;
+    } finally {
+      setCreatingCustomer(false);
+    }
+  };
+
+  const handleChat = async (event: React.FormEvent) => {
+    event.preventDefault();
+    const message = chatInput.trim();
+    if (!message || chatLoading) return;
 
     const userMessage: ChatMessage = {
       id: Date.now().toString(),
       role: 'user',
-      content: chatInput.trim(),
+      content: message,
       timestamp: new Date().toISOString(),
     };
 
-    setChatMessages(prev => [...prev, userMessage]);
+    setChatMessages((prev) => [...prev, userMessage]);
     setChatInput('');
     setChatLoading(true);
 
@@ -119,68 +198,66 @@ export default function ERPDashboard() {
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: chatInput.trim() }),
+        body: JSON.stringify({ message }),
       });
 
       const text = await response.text();
-
-      const assistantMessage: ChatMessage = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: text || '抱歉，我没有收到有效的回复',
-        timestamp: new Date().toISOString(),
-      };
-
-      setChatMessages(prev => [...prev, assistantMessage]);
+      setChatMessages((prev) => [
+        ...prev,
+        {
+          id: `${Date.now()}-assistant`,
+          role: 'assistant',
+          content: text || '暂未收到有效回复，请稍后重试。',
+          timestamp: new Date().toISOString(),
+        },
+      ]);
     } catch {
-      const errorMessage: ChatMessage = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: '抱歉，服务暂时不可用，请稍后重试',
-        timestamp: new Date().toISOString(),
-      };
-      setChatMessages(prev => [...prev, errorMessage]);
+      setChatMessages((prev) => [
+        ...prev,
+        {
+          id: `${Date.now()}-assistant`,
+          role: 'assistant',
+          content: '服务暂时不可用，请稍后再试。',
+          timestamp: new Date().toISOString(),
+        },
+      ]);
     } finally {
       setChatLoading(false);
     }
   };
 
-  const lowStockCount = mockInventory.filter(p => p.status === 'low').length;
-  const pendingPaymentCount = mockOrders.filter(o => o.status === '待付款').length;
-
   return (
     <div className="min-h-screen bg-slate-100 flex">
-      {/* Sidebar */}
-      <aside className={cn(
-        'bg-slate-800 text-white transition-all duration-300 flex flex-col',
-        sidebarCollapsed ? 'w-16' : 'w-64'
-      )}>
-        {/* Logo */}
+      <aside
+        className={cn(
+          'bg-slate-800 text-white transition-all duration-300 flex flex-col',
+          sidebarCollapsed ? 'w-16' : 'w-64'
+        )}
+      >
         <div className="h-16 flex items-center justify-between px-4 border-b border-slate-700">
           {!sidebarCollapsed && (
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center">
                 <BarChart3 className="w-5 h-5" />
               </div>
-              <span className="font-bold">ERP系统</span>
+              <span className="font-bold">ERP 系统</span>
             </div>
           )}
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+            onClick={() => setSidebarCollapsed((prev) => !prev)}
             className="text-white hover:bg-slate-700"
           >
             {sidebarCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
           </Button>
         </div>
 
-        {/* Navigation */}
         <nav className="flex-1 py-4">
-          {navItems.map(item => (
+          {navItems.map((item) => (
             <button
               key={item.id}
-              onClick={() => setActiveTab(item.id as TabType)}
+              onClick={() => setActiveTab(item.id)}
               className={cn(
                 'w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-700 transition-colors',
                 activeTab === item.id && 'bg-slate-700 border-r-2 border-blue-500'
@@ -189,16 +266,19 @@ export default function ERPDashboard() {
               <item.icon className="w-5 h-5 shrink-0" />
               {!sidebarCollapsed && <span>{item.label}</span>}
               {!sidebarCollapsed && item.id === 'inventory' && lowStockCount > 0 && (
-                <Badge variant="destructive" className="ml-auto text-xs">{lowStockCount}</Badge>
+                <Badge variant="destructive" className="ml-auto text-xs">
+                  {lowStockCount}
+                </Badge>
               )}
               {!sidebarCollapsed && item.id === 'orders' && pendingPaymentCount > 0 && (
-                <Badge variant="destructive" className="ml-auto text-xs">{pendingPaymentCount}</Badge>
+                <Badge variant="destructive" className="ml-auto text-xs">
+                  {pendingPaymentCount}
+                </Badge>
               )}
             </button>
           ))}
         </nav>
 
-        {/* Settings */}
         <div className="border-t border-slate-700 p-4">
           <button className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-700 rounded-lg transition-colors">
             <Settings className="w-5 h-5" />
@@ -207,12 +287,10 @@ export default function ERPDashboard() {
         </div>
       </aside>
 
-      {/* Main Content */}
       <main className="flex-1 flex flex-col">
-        {/* Header */}
         <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-6">
           <h2 className="text-lg font-semibold text-slate-800">
-            {navItems.find(n => n.id === activeTab)?.label}
+            {navItems.find((item) => item.id === activeTab)?.label}
           </h2>
           <div className="flex items-center gap-4">
             <Button variant="ghost" size="sm" className="relative">
@@ -229,19 +307,16 @@ export default function ERPDashboard() {
           </div>
         </header>
 
-        {/* Content Area */}
         <div className="flex-1 p-6 overflow-auto">
-          {/* Dashboard */}
           {activeTab === 'dashboard' && (
             <div className="space-y-6">
-              {/* Stats Cards */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 <Card>
                   <CardContent className="pt-6">
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="text-sm text-slate-500">客户总数</p>
-                        <p className="text-3xl font-bold text-slate-800">{mockCustomers.length}</p>
+                        <p className="text-3xl font-bold text-slate-800">{customers.length}</p>
                       </div>
                       <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
                         <Users className="w-6 h-6 text-blue-600" />
@@ -249,6 +324,7 @@ export default function ERPDashboard() {
                     </div>
                   </CardContent>
                 </Card>
+
                 <Card>
                   <CardContent className="pt-6">
                     <div className="flex items-center justify-between">
@@ -262,11 +338,12 @@ export default function ERPDashboard() {
                     </div>
                   </CardContent>
                 </Card>
+
                 <Card>
                   <CardContent className="pt-6">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-sm text-slate-500">产品种类</p>
+                        <p className="text-sm text-slate-500">商品种类</p>
                         <p className="text-3xl font-bold text-slate-800">{mockInventory.length}</p>
                       </div>
                       <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center">
@@ -275,12 +352,13 @@ export default function ERPDashboard() {
                     </div>
                   </CardContent>
                 </Card>
+
                 <Card>
                   <CardContent className="pt-6">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-sm text-slate-500">本月销售额</p>
-                        <p className="text-3xl font-bold text-slate-800">10.7万</p>
+                        <p className="text-sm text-slate-500">累计销售额</p>
+                        <p className="text-3xl font-bold text-slate-800">¥{monthlySales.toLocaleString()}</p>
                       </div>
                       <div className="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center">
                         <Wallet className="w-6 h-6 text-orange-600" />
@@ -290,7 +368,6 @@ export default function ERPDashboard() {
                 </Card>
               </div>
 
-              {/* Alerts */}
               {(lowStockCount > 0 || pendingPaymentCount > 0) && (
                 <Card className="border-orange-200 bg-orange-50">
                   <CardHeader className="pb-2">
@@ -299,40 +376,31 @@ export default function ERPDashboard() {
                       待处理事项
                     </CardTitle>
                   </CardHeader>
-                  <CardContent>
-                    <div className="space-y-2">
-                      {pendingPaymentCount > 0 && (
-                        <p className="text-orange-600">• 有 {pendingPaymentCount} 笔订单待收款</p>
-                      )}
-                      {lowStockCount > 0 && (
-                        <p className="text-orange-600">• 有 {lowStockCount} 种产品库存不足</p>
-                      )}
-                    </div>
+                  <CardContent className="space-y-2 text-orange-600">
+                    {pendingPaymentCount > 0 && <p>有 {pendingPaymentCount} 笔订单待收款</p>}
+                    {lowStockCount > 0 && <p>有 {lowStockCount} 个商品低于安全库存</p>}
                   </CardContent>
                 </Card>
               )}
 
-              {/* Recent Data */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <Card>
                   <CardHeader>
                     <CardTitle>最近订单</CardTitle>
                   </CardHeader>
-                  <CardContent>
-                    <div className="space-y-3">
-                      {mockOrders.slice(0, 5).map(order => (
-                        <div key={order.id} className="flex items-center justify-between py-2 border-b border-slate-100 last:border-0">
-                          <div>
-                            <p className="font-medium text-slate-800">{order.orderNo}</p>
-                            <p className="text-sm text-slate-500">{order.customer}</p>
-                          </div>
-                          <div className="text-right">
-                            <p className="font-medium">¥{order.amount.toLocaleString()}</p>
-                            <Badge className={statusColors[order.status]}>{order.status}</Badge>
-                          </div>
+                  <CardContent className="space-y-3">
+                    {mockOrders.slice(0, 5).map((order) => (
+                      <div key={order.id} className="flex items-center justify-between py-2 border-b border-slate-100 last:border-0">
+                        <div>
+                          <p className="font-medium text-slate-800">{order.orderNo}</p>
+                          <p className="text-sm text-slate-500">{order.customer}</p>
                         </div>
-                      ))}
-                    </div>
+                        <div className="text-right">
+                          <p className="font-medium">¥{order.amount.toLocaleString()}</p>
+                          <Badge className={statusColors[order.status]}>{order.status}</Badge>
+                        </div>
+                      </div>
+                    ))}
                   </CardContent>
                 </Card>
 
@@ -340,71 +408,82 @@ export default function ERPDashboard() {
                   <CardHeader>
                     <CardTitle>库存预警</CardTitle>
                   </CardHeader>
-                  <CardContent>
-                    <div className="space-y-3">
-                      {mockInventory.filter(p => p.status === 'low').map(product => (
-                        <div key={product.id} className="flex items-center justify-between py-2 border-b border-slate-100 last:border-0">
-                          <div>
-                            <p className="font-medium text-slate-800">{product.name}</p>
-                            <p className="text-sm text-slate-500">安全库存: {product.safeStock}{product.unit}</p>
-                          </div>
-                          <div className="text-right">
-                            <p className="font-medium text-red-600">{product.stock}{product.unit}</p>
-                            <Badge className="bg-red-100 text-red-700">库存不足</Badge>
-                          </div>
+                  <CardContent className="space-y-3">
+                    {mockInventory.filter((item) => item.status === 'low').map((product) => (
+                      <div key={product.id} className="flex items-center justify-between py-2 border-b border-slate-100 last:border-0">
+                        <div>
+                          <p className="font-medium text-slate-800">{product.name}</p>
+                          <p className="text-sm text-slate-500">安全库存：{product.safeStock}{product.unit}</p>
                         </div>
-                      ))}
-                      {mockInventory.filter(p => p.status === 'low').length === 0 && (
-                        <p className="text-slate-500 text-center py-4">库存状态良好</p>
-                      )}
-                    </div>
+                        <div className="text-right">
+                          <p className="font-medium text-red-600">{product.stock}{product.unit}</p>
+                          <Badge className="bg-red-100 text-red-700">库存不足</Badge>
+                        </div>
+                      </div>
+                    ))}
                   </CardContent>
                 </Card>
               </div>
             </div>
           )}
 
-          {/* Customers */}
           {activeTab === 'customers' && (
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle>客户列表</CardTitle>
-                <Button>添加客户</Button>
+                <div>
+                  <CardTitle>客户列表</CardTitle>
+                  <p className="text-sm text-slate-500 mt-1">支持新增客户、即时校验和持久化保存。</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => void loadCustomers()}
+                    disabled={customerLoading}
+                  >
+                    <RefreshCw className={cn('mr-2 h-4 w-4', customerLoading && 'animate-spin')} />
+                    刷新
+                  </Button>
+                  <Button onClick={() => setCustomerDialogOpen(true)}>添加客户</Button>
+                </div>
               </CardHeader>
               <CardContent>
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b border-slate-200">
-                        <th className="text-left py-3 px-4 font-medium text-slate-600">客户名称</th>
-                        <th className="text-left py-3 px-4 font-medium text-slate-600">公司</th>
-                        <th className="text-left py-3 px-4 font-medium text-slate-600">电话</th>
-                        <th className="text-left py-3 px-4 font-medium text-slate-600">等级</th>
-                        <th className="text-left py-3 px-4 font-medium text-slate-600">订单数</th>
-                        <th className="text-left py-3 px-4 font-medium text-slate-600">累计金额</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {mockCustomers.map(customer => (
-                        <tr key={customer.id} className="border-b border-slate-100 hover:bg-slate-50">
-                          <td className="py-3 px-4 font-medium">{customer.name}</td>
-                          <td className="py-3 px-4 text-slate-600">{customer.company}</td>
-                          <td className="py-3 px-4 text-slate-600">{customer.phone}</td>
-                          <td className="py-3 px-4">
-                            <Badge className={statusColors[customer.level]}>{customer.level}</Badge>
-                          </td>
-                          <td className="py-3 px-4">{customer.totalOrders}</td>
-                          <td className="py-3 px-4">¥{customer.totalAmount.toLocaleString()}</td>
+                {customerLoading ? (
+                  <div className="py-16 text-center text-slate-500">正在加载客户数据...</div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b border-slate-200">
+                          <th className="text-left py-3 px-4 font-medium text-slate-600">客户名称</th>
+                          <th className="text-left py-3 px-4 font-medium text-slate-600">公司名称</th>
+                          <th className="text-left py-3 px-4 font-medium text-slate-600">联系电话</th>
+                          <th className="text-left py-3 px-4 font-medium text-slate-600">客户等级</th>
+                          <th className="text-left py-3 px-4 font-medium text-slate-600">订单数</th>
+                          <th className="text-left py-3 px-4 font-medium text-slate-600">累计金额</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                      </thead>
+                      <tbody>
+                        {customers.map((customer) => (
+                          <tr key={customer.id} className="border-b border-slate-100 hover:bg-slate-50">
+                            <td className="py-3 px-4 font-medium text-slate-800">{customer.name}</td>
+                            <td className="py-3 px-4 text-slate-600">{customer.company}</td>
+                            <td className="py-3 px-4 text-slate-600">{customer.phone}</td>
+                            <td className="py-3 px-4">
+                              <Badge className={statusColors[customer.level]}>{customer.level}</Badge>
+                            </td>
+                            <td className="py-3 px-4">{customer.totalOrders}</td>
+                            <td className="py-3 px-4">¥{customer.totalAmount.toLocaleString()}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </CardContent>
             </Card>
           )}
 
-          {/* Orders */}
           {activeTab === 'orders' && (
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
@@ -425,7 +504,7 @@ export default function ERPDashboard() {
                       </tr>
                     </thead>
                     <tbody>
-                      {mockOrders.map(order => (
+                      {mockOrders.map((order) => (
                         <tr key={order.id} className="border-b border-slate-100 hover:bg-slate-50">
                           <td className="py-3 px-4 font-medium">{order.orderNo}</td>
                           <td className="py-3 px-4 text-slate-600">{order.customer}</td>
@@ -435,7 +514,9 @@ export default function ERPDashboard() {
                             <Badge className={statusColors[order.status]}>{order.status}</Badge>
                           </td>
                           <td className="py-3 px-4">
-                            <Button variant="ghost" size="sm">详情</Button>
+                            <Button variant="ghost" size="sm">
+                              详情
+                            </Button>
                           </td>
                         </tr>
                       ))}
@@ -446,7 +527,6 @@ export default function ERPDashboard() {
             </Card>
           )}
 
-          {/* Inventory */}
           {activeTab === 'inventory' && (
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
@@ -470,16 +550,20 @@ export default function ERPDashboard() {
                       </tr>
                     </thead>
                     <tbody>
-                      {mockInventory.map(product => (
+                      {mockInventory.map((product) => (
                         <tr key={product.id} className="border-b border-slate-100 hover:bg-slate-50">
                           <td className="py-3 px-4 font-mono text-sm">{product.code}</td>
                           <td className="py-3 px-4 font-medium">{product.name}</td>
                           <td className="py-3 px-4">
                             <span className={product.status === 'low' ? 'text-red-600 font-medium' : ''}>
-                              {product.stock}{product.unit}
+                              {product.stock}
+                              {product.unit}
                             </span>
                           </td>
-                          <td className="py-3 px-4 text-slate-600">{product.safeStock}{product.unit}</td>
+                          <td className="py-3 px-4 text-slate-600">
+                            {product.safeStock}
+                            {product.unit}
+                          </td>
                           <td className="py-3 px-4">¥{product.price}</td>
                           <td className="py-3 px-4">
                             <Badge className={statusColors[product.status]}>
@@ -495,7 +579,6 @@ export default function ERPDashboard() {
             </Card>
           )}
 
-          {/* Finance */}
           {activeTab === 'finance' && (
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
@@ -519,7 +602,7 @@ export default function ERPDashboard() {
                       </tr>
                     </thead>
                     <tbody>
-                      {mockFinance.map(record => (
+                      {mockFinance.map((record) => (
                         <tr key={record.id} className="border-b border-slate-100 hover:bg-slate-50">
                           <td className="py-3 px-4 text-slate-600">{record.date}</td>
                           <td className="py-3 px-4">
@@ -548,7 +631,14 @@ export default function ERPDashboard() {
         </div>
       </main>
 
-      {/* AI Chat Button - ERP智能助手 */}
+      <AddCustomerDialog
+        existingCustomers={customers}
+        onOpenChange={setCustomerDialogOpen}
+        onSubmit={handleCreateCustomer}
+        open={customerDialogOpen}
+        submitting={creatingCustomer}
+      />
+
       <button
         onClick={() => setChatOpen(true)}
         className={cn(
@@ -559,7 +649,6 @@ export default function ERPDashboard() {
         <Bot className="w-7 h-7" />
       </button>
 
-      {/* Dify Chat Button - 火箭图标 */}
       <button
         onClick={() => setDifyOpen(true)}
         className={cn(
@@ -570,14 +659,11 @@ export default function ERPDashboard() {
         <Rocket className="w-7 h-7" />
       </button>
 
-      {/* Dify Chat Panel */}
       {difyOpen && <DifyChat onClose={() => setDifyOpen(false)} />}
 
-      {/* AI Chat Panel */}
       {chatOpen && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-end justify-end p-6">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md h-[600px] flex flex-col animate-in slide-in-from-bottom-4 duration-300">
-            {/* Chat Header */}
             <div className="h-16 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-t-2xl flex items-center justify-between px-4 shrink-0">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
@@ -598,26 +684,20 @@ export default function ERPDashboard() {
               </Button>
             </div>
 
-            {/* Chat Messages */}
             <ScrollArea className="flex-1 p-4">
               <div className="space-y-4">
-                {chatMessages.map(msg => (
+                {chatMessages.map((message) => (
                   <div
-                    key={msg.id}
-                    className={cn(
-                      'flex gap-3',
-                      msg.role === 'user' && 'flex-row-reverse'
-                    )}
+                    key={message.id}
+                    className={cn('flex gap-3', message.role === 'user' && 'flex-row-reverse')}
                   >
                     <div
                       className={cn(
                         'w-8 h-8 rounded-xl flex items-center justify-center shrink-0',
-                        msg.role === 'user'
-                          ? 'bg-emerald-500'
-                          : 'bg-blue-500'
+                        message.role === 'user' ? 'bg-emerald-500' : 'bg-blue-500'
                       )}
                     >
-                      {msg.role === 'user' ? (
+                      {message.role === 'user' ? (
                         <span className="text-white text-xs font-medium">我</span>
                       ) : (
                         <Bot className="w-4 h-4 text-white" />
@@ -626,13 +706,13 @@ export default function ERPDashboard() {
                     <div
                       className={cn(
                         'max-w-[80%] rounded-2xl px-4 py-2',
-                        msg.role === 'user'
+                        message.role === 'user'
                           ? 'bg-emerald-500 text-white'
                           : 'bg-slate-100 text-slate-700'
                       )}
                     >
                       <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed">
-                        {msg.content}
+                        {message.content}
                       </pre>
                     </div>
                   </div>
@@ -654,12 +734,11 @@ export default function ERPDashboard() {
               </div>
             </ScrollArea>
 
-            {/* Chat Input */}
             <div className="p-4 border-t border-slate-200 shrink-0">
               <form onSubmit={handleChat} className="flex gap-2">
                 <Input
                   value={chatInput}
-                  onChange={(e) => setChatInput(e.target.value)}
+                  onChange={(event) => setChatInput(event.target.value)}
                   placeholder="输入您的问题..."
                   className="flex-1"
                   disabled={chatLoading}
@@ -669,9 +748,15 @@ export default function ERPDashboard() {
                 </Button>
               </form>
               <div className="flex gap-2 mt-2">
-                <Button variant="ghost" size="sm" className="text-xs" onClick={() => setChatInput('查看客户列表')}>客户列表</Button>
-                <Button variant="ghost" size="sm" className="text-xs" onClick={() => setChatInput('查看订单')}>订单查询</Button>
-                <Button variant="ghost" size="sm" className="text-xs" onClick={() => setChatInput('生成报表')}>经营报表</Button>
+                <Button variant="ghost" size="sm" className="text-xs" onClick={() => setChatInput('查看客户列表')}>
+                  客户列表
+                </Button>
+                <Button variant="ghost" size="sm" className="text-xs" onClick={() => setChatInput('查看订单')}>
+                  订单查询
+                </Button>
+                <Button variant="ghost" size="sm" className="text-xs" onClick={() => setChatInput('生成经营报表')}>
+                  经营报表
+                </Button>
               </div>
             </div>
           </div>
