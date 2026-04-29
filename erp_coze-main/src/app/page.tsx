@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { 
   Users, ShoppingCart, Package, Wallet, BarChart3, 
   Settings, Bell, ChevronLeft, ChevronRight, Bot,
-  X, Send, RefreshCw, AlertCircle, Rocket
+  X, Send, AlertCircle, Rocket
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,6 +13,9 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import DifyChat from '@/components/DifyChat';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
 
 type TabType = 'customers' | 'orders' | 'inventory' | 'finance' | 'dashboard';
 
@@ -41,7 +44,7 @@ const mockOrders = [
   { id: 'ORD006', orderNo: 'ORD20240212006', customer: '李四', amount: 7500, status: '已取消', date: '2024-02-12', items: 1 },
 ];
 
-const mockInventory = [
+const initialInventory = [
   { id: 'P001', name: '笔记本电脑', code: 'IT001', stock: 25, safeStock: 10, price: 5000, unit: '台', status: 'normal' },
   { id: 'P002', name: '无线鼠标', code: 'IT002', stock: 80, safeStock: 30, price: 150, unit: '个', status: 'normal' },
   { id: 'P003', name: '激光打印机', code: 'IT003', stock: 12, safeStock: 5, price: 2800, unit: '台', status: 'normal' },
@@ -91,6 +94,40 @@ export default function ERPDashboard() {
   ]);
   const [chatInput, setChatInput] = useState('');
   const [chatLoading, setChatLoading] = useState(false);
+
+  // 库存状态
+  const [mockInventory, setMockInventory] = useState(initialInventory);
+
+  // 出库功能状态
+  const [outboundOpen, setOutboundOpen] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState('');
+  const [outboundQty, setOutboundQty] = useState('');
+  const [outboundRemark, setOutboundRemark] = useState('');
+
+  // 出库方法
+  const handleOutbound = () => {
+    if (!selectedProduct || !outboundQty) return;
+    const qty = parseInt(outboundQty);
+    if (qty <= 0) return;
+
+    const product = mockInventory.find(p => p.code === selectedProduct);
+    if (!product || product.stock < qty) {
+      alert('库存不足，无法出库！');
+      return;
+    }
+
+    setMockInventory(prev => prev.map(p => 
+      p.code === selectedProduct 
+        ? { ...p, stock: p.stock - qty, status: p.stock - qty < p.safeStock ? 'low' : 'normal' } 
+        : p
+    ));
+
+    setOutboundOpen(false);
+    setSelectedProduct('');
+    setOutboundQty('');
+    setOutboundRemark('');
+    alert('出库成功！');
+  };
 
   const navItems = [
     { id: 'dashboard', label: '经营概览', icon: BarChart3 },
@@ -175,7 +212,7 @@ export default function ERPDashboard() {
           </Button>
         </div>
 
-        {/* Navigation */}
+          {/* Navigation */}
         <nav className="flex-1 py-4">
           {navItems.map(item => (
             <button
@@ -198,7 +235,7 @@ export default function ERPDashboard() {
           ))}
         </nav>
 
-        {/* Settings */}
+          {/* Settings */}
         <div className="border-t border-slate-700 p-4">
           <button className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-700 rounded-lg transition-colors">
             <Settings className="w-5 h-5" />
@@ -228,7 +265,7 @@ export default function ERPDashboard() {
             </div>
           </div>
         </header>
-
+        
         {/* Content Area */}
         <div className="flex-1 p-6 overflow-auto">
           {/* Dashboard */}
@@ -453,7 +490,7 @@ export default function ERPDashboard() {
                 <CardTitle>库存列表</CardTitle>
                 <div className="flex gap-2">
                   <Button variant="outline">入库</Button>
-                  <Button variant="outline">出库</Button>
+                  <Button variant="outline" onClick={() => setOutboundOpen(true)}>出库</Button>
                 </div>
               </CardHeader>
               <CardContent>
@@ -494,6 +531,54 @@ export default function ERPDashboard() {
               </CardContent>
             </Card>
           )}
+
+          {/* 出库弹窗 */}
+          <Dialog open={outboundOpen} onOpenChange={setOutboundOpen}>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>商品出库</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 mt-2">
+                <div>
+                  <Label>选择商品</Label>
+                  <Select value={selectedProduct} onValueChange={setSelectedProduct}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="请选择商品" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {mockInventory.map(p => (
+                        <SelectItem key={p.code} value={p.code}>
+                          {p.name} ({p.code}) - 库存:{p.stock}{p.unit}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>出库数量</Label>
+                  <Input
+                    type="number"
+                    min="1"
+                    value={outboundQty}
+                    onChange={(e) => setOutboundQty(e.target.value)}
+                    placeholder="请输入出库数量"
+                  />
+                </div>
+                <div>
+                  <Label>备注</Label>
+                  <Input
+                    value={outboundRemark}
+                    onChange={(e) => setOutboundRemark(e.target.value)}
+                    placeholder="出库原因/订单号"
+                  />
+                </div>
+                <div className="flex justify-end gap-2 mt-4">
+                  <Button variant="outline" onClick={() => setOutboundOpen(false)}>取消</Button>
+                  <Button onClick={handleOutbound}>确认出库</Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
 
           {/* Finance */}
           {activeTab === 'finance' && (
@@ -559,7 +644,7 @@ export default function ERPDashboard() {
         <Bot className="w-7 h-7" />
       </button>
 
-      {/* Dify Chat Button - 火箭图标 */}
+      {/* Dify Chat Button - 火箭图标 */}  
       <button
         onClick={() => setDifyOpen(true)}
         className={cn(
@@ -653,7 +738,7 @@ export default function ERPDashboard() {
                 )}
               </div>
             </ScrollArea>
-
+            
             {/* Chat Input */}
             <div className="p-4 border-t border-slate-200 shrink-0">
               <form onSubmit={handleChat} className="flex gap-2">
