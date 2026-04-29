@@ -31,13 +31,7 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface AddCustomerDialogProps {
   existingCustomers: CustomerListItem[];
@@ -95,9 +89,7 @@ export default function AddCustomerDialog({
       <DialogContent className="sm:max-w-xl">
         <DialogHeader>
           <DialogTitle>添加客户</DialogTitle>
-          <DialogDescription>
-            录入客户基础信息后，系统将自动生成客户 ID、订单数、累计金额、创建时间和更新时间。
-          </DialogDescription>
+          <DialogDescription>录入客户基础信息后，系统会自动统计该客户的订单数与累计成交金额。</DialogDescription>
         </DialogHeader>
 
         <Form {...form}>
@@ -147,12 +139,7 @@ export default function AddCustomerDialog({
                   <FormItem>
                     <FormLabel>联系电话</FormLabel>
                     <FormControl>
-                      <Input
-                        inputMode="numeric"
-                        placeholder="请输入 11 位手机号"
-                        maxLength={11}
-                        {...field}
-                      />
+                      <Input inputMode="numeric" placeholder="请输入 11 位手机号" maxLength={11} {...field} />
                     </FormControl>
                     <FormDescription>仅支持中国大陆 11 位手机号。</FormDescription>
                     <FormMessage />
@@ -180,7 +167,7 @@ export default function AddCustomerDialog({
                         ))}
                       </SelectContent>
                     </Select>
-                    <FormDescription>选填，默认值为“新客户”。</FormDescription>
+                    <FormDescription>默认等级为“新客户”。</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -188,8 +175,8 @@ export default function AddCustomerDialog({
             </div>
 
             <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-              <p className="font-medium text-slate-800">系统自动生成</p>
-              <p className="mt-2">客户 ID、订单数（默认 0）、累计金额（默认 0）、创建时间、更新时间</p>
+              <p className="font-medium text-slate-800">系统自动维护</p>
+              <p className="mt-2">创建后会自动记录创建时间、更新时间，并在后续订单流转中统计订单数与累计金额。</p>
             </div>
 
             <DialogFooter>
