@@ -1,9 +1,5 @@
 
-
-
-
 import {
-  getAllCustomers,
   getAllFinanceRecords,
   getAllOrders,
   getAllProducts,
@@ -14,10 +10,10 @@ import {
   getOrdersByCustomerId,
   getPendingPaymentOrders,
   getTopCustomerBySales,
-  searchCustomers,
   searchOrders,
   searchProducts
 } from './mockData';
+import { getCustomers, searchCustomers } from './customer-store';
 import { BusinessIntent, Order, Product } from './types';
 
 // 业务查询服务
@@ -50,12 +46,12 @@ export class BusinessQueryService {
   }
 
   // 查询客户
-  private queryCustomer(name?: string): string {
+  private async queryCustomer(name?: string): Promise<string> {
     let customers;
     if (name) {
-      customers = searchCustomers(name);
+      customers = await searchCustomers(name);
     } else {
-      customers = getAllCustomers();
+      customers = await getCustomers();
     }
 
     if (customers.length === 0) {
@@ -68,10 +64,9 @@ export class BusinessQueryService {
 - 客户名称：${c.name}
 - 公司：${c.company}
 - 电话：${c.phone}
-- 邮箱：${c.email}
-- 地址：${c.address}
 - 客户等级：${c.level}
-- 跟进记录：${c.followRecords.length > 0 ? c.followRecords.map(r => `【${r.date}】${r.type}：${r.content}`).join('\n  ') : '暂无跟进记录'}
+- 订单数：${c.totalOrders}
+- 累计金额：${c.totalAmount.toLocaleString()}元
 - 创建时间：${c.createdAt}`;
     }
 
@@ -80,12 +75,12 @@ ${customers.map(c => `- ${c.name}（${c.company}）- ${c.level} - 电话：${c.p
   }
 
   // 查询订单
-  private queryOrder(customerName?: string, orderNo?: string): string {
+  private async queryOrder(customerName?: string, orderNo?: string): Promise<string> {
     let orders: Order[];
     if (orderNo) {
       orders = searchOrders(orderNo);
     } else if (customerName) {
-      const customers = searchCustomers(customerName);
+      const customers = await searchCustomers(customerName);
       if (customers.length === 1) {
         orders = getOrdersByCustomerId(customers[0].id);
       } else if (customers.length > 1) {
@@ -202,8 +197,8 @@ ${records.slice(0, 5).map(r => {
   }
 
   // 生成报表
-  private generateReport(): string {
-    const customers = getAllCustomers();
+  private async generateReport(): Promise<string> {
+    const customers = await getCustomers();
     const orders = getAllOrders();
     const products = getAllProducts();
     const lowStock = getLowStockProducts();
