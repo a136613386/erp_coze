@@ -130,7 +130,7 @@ function extractEntities(message: string): {
 // 使用LLM进行意图识别
 export class IntentRecognition {
   private client: LLMClient;
-  private systemPrompt = `你是ERP系统的AI助手，负责理解用户的业务查询意图。
+  private systemPrompt = `你是天商ERP系统的AI助手，负责理解用户的业务查询意图。
 
 请根据用户的输入，判断他们的意图类型：
 
@@ -237,7 +237,7 @@ export class IntentRecognition {
       case 'anomaly_alert':
         return queryResult;
       case 'general_chat':
-        return '您好！我是ERP智能助手，可以帮您：\n- 查询客户、订单、库存信息\n- 生成经营报表\n- 提醒异常情况\n\n请告诉我您需要什么帮助？';
+        return '您好！我是天商ERP智能助手，可以帮您：\n- 查询客户、订单、库存信息\n- 生成经营报表\n- 提醒异常情况\n\n请告诉我您需要什么帮助？';
       default:
         return '抱歉，我不太理解您的意思。请尝试以下方式提问：\n- "查看客户列表"\n- "查看张三的订单"\n- "查看库存情况"\n- "生成经营报表"\n- "检查系统异常"';
     }

@@ -3,12 +3,12 @@ import { Inspector } from 'react-dev-inspector';
 import './globals.css';
 export const metadata: Metadata = {
   title: {
-    default: 'ERP 智能助手 | 小微企业管理系统',
-    template: '%s | ERP 智能助手',
+    default: '天商ERP系统 | 小微企业管理系统',
+    template: '%s | 天商ERP系统',
   },
-  description: '面向小微企业的ERP教学演示系统，支持客户管理、订单管理、库存管理、财务管理等核心功能，以及AI智能助手对话交互。',
+  description: '面向小微企业的天商ERP教学演示系统，支持客户管理、订单管理、库存管理、财务管理等核心功能，以及AI智能助手对话交互。',
   keywords: [
-    'ERP系统',
+    '天商ERP系统',
     '企业管理',
     '客户管理',
     '订单管理',
@@ -17,10 +17,10 @@ export const metadata: Metadata = {
     '智能助手',
     '小微企业',
   ],
-  authors: [{ name: 'ERP Team' }],
+  authors: [{ name: '天商ERP Team' }],
   openGraph: {
-    title: 'ERP 智能助手 | 小微企业管理系统',
-    description: '面向小微企业的ERP教学演示系统',
+    title: '天商ERP系统 | 小微企业管理系统',
+    description: '面向小微企业的天商ERP教学演示系统',
     locale: 'zh_CN',
     type: 'website',
   },

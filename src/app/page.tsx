@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { 
   Users, ShoppingCart, Package, Wallet, BarChart3, 
   Settings, Bell, ChevronLeft, ChevronRight, Bot,
-  X, Send, RefreshCw, AlertCircle, Rocket
+  X, Send, RefreshCw, AlertCircle, Headset
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -85,7 +85,7 @@ export default function ERPDashboard() {
     {
       id: '1',
       role: 'assistant',
-      content: '您好！我是ERP智能助手，可以帮您查询客户、订单、库存、财务等信息，也可以帮您生成经营报表或检查异常情况。',
+      content: '您好！我是天商ERP智能助手，可以帮您查询客户、订单、库存、财务等信息，也可以帮您生成经营报表或检查异常情况。',
       timestamp: new Date().toISOString(),
     },
   ]);
@@ -162,7 +162,7 @@ export default function ERPDashboard() {
               <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center">
                 <BarChart3 className="w-5 h-5" />
               </div>
-              <span className="font-bold">ERP系统</span>
+              <span className="font-bold">天商ERP系统</span>
             </div>
           )}
           <Button
@@ -559,7 +559,7 @@ export default function ERPDashboard() {
         <Bot className="w-7 h-7" />
       </button>
 
-      {/* Dify Chat Button - 火箭图标 */}
+      {/* Dify Chat Button - 智能客服图标 */}
       <button
         onClick={() => setDifyOpen(true)}
         className={cn(
@@ -567,7 +567,7 @@ export default function ERPDashboard() {
           difyOpen && 'hidden'
         )}
       >
-        <Rocket className="w-7 h-7" />
+        <Headset className="w-7 h-7" />
       </button>
 
       {/* Dify Chat Panel */}
@@ -584,7 +584,7 @@ export default function ERPDashboard() {
                   <Bot className="w-6 h-6 text-white" />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-white">ERP 智能助手</h3>
+                  <h3 className="font-semibold text-white">天商ERP智能助手</h3>
                   <p className="text-xs text-blue-100">在线</p>
                 </div>
               </div>

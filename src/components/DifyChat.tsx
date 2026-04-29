@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import { Headset } from 'lucide-react';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -13,7 +14,7 @@ interface DifyChatProps {
 
 export default function DifyChat({ onClose }: DifyChatProps) {
   const [messages, setMessages] = useState<Message[]>([
-    { role: 'assistant', content: '你好！我是Dify智能助手，有什么可以帮助你的吗？' }
+    { role: 'assistant', content: '你好！我是天商智能客服，有什么可以帮助你的吗？' }
   ]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -67,13 +68,11 @@ export default function DifyChat({ onClose }: DifyChatProps) {
       <div className="bg-gradient-to-r from-orange-500 to-red-500 text-white p-3 rounded-t-lg flex justify-between items-center">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
-            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
-            </svg>
+            <Headset className="w-5 h-5" />
           </div>
           <div>
-            <div className="font-semibold text-sm">Dify 智能助手</div>
-            <div className="text-xs opacity-80">AI 通用对话</div>
+            <div className="font-semibold text-sm">天商智能客服</div>
+            <div className="text-xs opacity-80">在线咨询与通用对话</div>
           </div>
         </div>
         <button 
