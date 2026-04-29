@@ -33,12 +33,12 @@ const mockCustomers = [
 ];
 
 const mockOrders = [
-  { id: 'ORD001', orderNo: 'ORD20240115001', customer: '张三', amount: 53000, status: '已完成', date: '2024-01-15', items: 2 },
-  { id: 'ORD002', orderNo: 'ORD20240120002', customer: '李四', amount: 14000, status: '已发货', date: '2024-01-20', items: 1 },
-  { id: 'ORD003', orderNo: 'ORD20240201003', customer: '张三', amount: 30000, status: '待付款', date: '2024-02-01', items: 2 },
+  { id: 'ORD001', orderNo: 'ORD20240115001', customer: '陈明', amount: 53000, status: '已完成', date: '2024-01-15', items: 2 },
+  { id: 'ORD002', orderNo: 'ORD20240120002', customer: '赵敏', amount: 14000, status: '已发货', date: '2024-01-20', items: 1 },
+  { id: 'ORD003', orderNo: 'ORD20240201003', customer: '陈明', amount: 30000, status: '待付款', date: '2024-02-01', items: 2 },
   { id: 'ORD004', orderNo: 'ORD20240205004', customer: '王五', amount: 40000, status: '已付款', date: '2024-02-05', items: 1 },
   { id: 'ORD005', orderNo: 'ORD20240210005', customer: '赵六', amount: 65000, status: '待付款', date: '2024-02-10', items: 2 },
-  { id: 'ORD006', orderNo: 'ORD20240212006', customer: '李四', amount: 7500, status: '已取消', date: '2024-02-12', items: 1 },
+  { id: 'ORD006', orderNo: 'ORD20240212006', customer: '赵敏', amount: 7500, status: '已取消', date: '2024-02-12', items: 1 },
 ];
 
 const mockInventory = [
