@@ -1,17 +1,29 @@
 'use client';
 
-import { useState } from 'react';
+import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import { 
   Users, ShoppingCart, Package, Wallet, BarChart3, 
   Settings, Bell, ChevronLeft, ChevronRight, Bot,
-  X, Send, RefreshCw, AlertCircle, Rocket
+  X, AlertCircle, Rocket, Send
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  createDashboardOverviewCards,
+  createDashboardOverviewMetrics,
+  createDashboardOverviewRepository,
+  type DashboardOverviewCard,
+  type DashboardOverviewMetrics,
+  type DashboardOverviewCardKey,
+} from '@/lib/dashboard-overview';
 import { cn } from '@/lib/utils';
+import { mergeOrderRow, readOrderOverrides } from '@/lib/order-detail-data';
 import DifyChat from '@/components/DifyChat';
 
 type TabType = 'customers' | 'orders' | 'inventory' | 'finance' | 'dashboard';
@@ -23,8 +35,27 @@ interface ChatMessage {
   timestamp: string;
 }
 
-// 模拟数据
-const mockCustomers = [
+interface OrderFormState {
+  customerId: string;
+  orderDate: string;
+  productName: string;
+  quantity: string;
+  price: string;
+  status: string;
+  shippingAddress: string;
+}
+
+interface CustomerRow {
+  id: string;
+  name: string;
+  company: string;
+  phone: string;
+  level: 'VIP' | '普通' | '新客户';
+  totalOrders: number;
+  totalAmount: number;
+}
+
+const initialCustomers: CustomerRow[] = [
   { id: 'C001', name: '张三', company: '北京科技有限公司', phone: '13800138001', level: 'VIP', totalOrders: 2, totalAmount: 83000 },
   { id: 'C002', name: '李四', company: '上海贸易集团', phone: '13800138002', level: '普通', totalOrders: 2, totalAmount: 21500 },
   { id: 'C003', name: '王五', company: '广州制造业公司', phone: '13800138003', level: '新客户', totalOrders: 1, totalAmount: 40000 },
@@ -40,6 +71,14 @@ const mockOrders = [
   { id: 'ORD005', orderNo: 'ORD20240210005', customer: '赵六', amount: 65000, status: '待付款', date: '2024-02-10', items: 2 },
   { id: 'ORD006', orderNo: 'ORD20240212006', customer: '李四', amount: 7500, status: '已取消', date: '2024-02-12', items: 1 },
 ];
+
+type OrderRow = (typeof mockOrders)[number] & {
+  shippingAddress?: string;
+  productName?: string;
+};
+
+const orderStatusOptions = Array.from(new Set(mockOrders.map(order => order.status)));
+const pendingOrderStatus = mockOrders[2].status;
 
 const mockInventory = [
   { id: 'P001', name: '笔记本电脑', code: 'IT001', stock: 25, safeStock: 10, price: 5000, unit: '台', status: 'normal' },
@@ -76,11 +115,31 @@ const statusColors: Record<string, string> = {
   'normal': 'bg-green-100 text-green-700',
 };
 
+const overviewCardIcons: Record<DashboardOverviewCardKey, typeof Users> = {
+  customerTotal: Users,
+  orderTotal: ShoppingCart,
+  productTotal: Package,
+  monthlySales: Wallet,
+};
+
 export default function ERPDashboard() {
+  const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<TabType>('dashboard');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   const [difyOpen, setDifyOpen] = useState(false);
+  const [customers, setCustomers] = useState<CustomerRow[]>(initialCustomers);
+  const [orders, setOrders] = useState<OrderRow[]>(mockOrders);
+  const [createOrderOpen, setCreateOrderOpen] = useState(false);
+  const [orderForm, setOrderForm] = useState<OrderFormState>({
+    customerId: initialCustomers[0].id,
+    orderDate: new Date().toISOString().slice(0, 10),
+    productName: '',
+    quantity: '1',
+    price: '',
+    status: pendingOrderStatus,
+    shippingAddress: '',
+  });
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
     {
       id: '1',
@@ -91,6 +150,89 @@ export default function ERPDashboard() {
   ]);
   const [chatInput, setChatInput] = useState('');
   const [chatLoading, setChatLoading] = useState(false);
+  const [overviewMetrics, setOverviewMetrics] = useState<DashboardOverviewMetrics>(
+    createDashboardOverviewMetrics({
+      customerTotal: 0,
+      orderTotal: 0,
+      productTotal: 0,
+      monthlySales: 0,
+    })
+  );
+
+  useEffect(() => {
+    const overrides = readOrderOverrides();
+    if (Object.keys(overrides).length === 0) return;
+
+    setOrders(prev => prev.map(order => mergeOrderRow(order, overrides[order.id])));
+  }, []);
+
+  useEffect(() => {
+    const tab = searchParams.get('tab');
+    if (tab === 'customers' || tab === 'orders' || tab === 'inventory' || tab === 'finance' || tab === 'dashboard') {
+      setActiveTab(tab);
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
+    const repository = createDashboardOverviewRepository({
+      customers,
+      orders,
+      products: mockInventory,
+      financeRecords: mockFinance,
+    });
+
+    repository.getMetrics().then(setOverviewMetrics);
+  }, [customers, orders]);
+
+  const handleOrderFormChange = (field: keyof OrderFormState, value: string) => {
+    setOrderForm(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleCreateOrder = () => {
+    const customer = customers.find(item => item.id === orderForm.customerId)!;
+    const quantity = Number(orderForm.quantity);
+    const price = Number(orderForm.price);
+    const totalAmount = quantity * price;
+    const nextNumber = String(orders.length + 1).padStart(3, '0');
+    const orderDateText = orderForm.orderDate.replaceAll('-', '');
+
+    setOrders(prev => [
+      {
+        id: `ORD${nextNumber}`,
+        orderNo: `ORD${orderDateText}${nextNumber}`,
+        customer: customer.name,
+        amount: totalAmount,
+        status: orderForm.status,
+        date: orderForm.orderDate,
+        items: quantity,
+        shippingAddress: orderForm.shippingAddress,
+        productName: orderForm.productName,
+      },
+      ...prev,
+    ]);
+    setCustomers(prev =>
+      prev.map(item =>
+        item.id === customer.id
+          ? {
+              ...item,
+              totalOrders: item.totalOrders + 1,
+              totalAmount: item.totalAmount + totalAmount,
+            }
+          : item
+      )
+    );
+
+    setCreateOrderOpen(false);
+    setOrderForm({
+      customerId: customers[0]?.id || '',
+      orderDate: new Date().toISOString().slice(0, 10),
+      productName: '',
+      quantity: '1',
+      price: '',
+      status: pendingOrderStatus,
+      shippingAddress: '',
+    });
+  };
 
   const navItems = [
     { id: 'dashboard', label: '经营概览', icon: BarChart3 },
@@ -146,7 +288,9 @@ export default function ERPDashboard() {
   };
 
   const lowStockCount = mockInventory.filter(p => p.status === 'low').length;
-  const pendingPaymentCount = mockOrders.filter(o => o.status === '待付款').length;
+  const orderPendingPaymentCount = orders.filter(o => o.status === pendingOrderStatus).length;
+  const orderTotalAmount = Number(orderForm.quantity) * Number(orderForm.price || '0');
+  const overviewCards: DashboardOverviewCard[] = createDashboardOverviewCards(overviewMetrics);
 
   return (
     <div className="min-h-screen bg-slate-100 flex">
@@ -191,8 +335,8 @@ export default function ERPDashboard() {
               {!sidebarCollapsed && item.id === 'inventory' && lowStockCount > 0 && (
                 <Badge variant="destructive" className="ml-auto text-xs">{lowStockCount}</Badge>
               )}
-              {!sidebarCollapsed && item.id === 'orders' && pendingPaymentCount > 0 && (
-                <Badge variant="destructive" className="ml-auto text-xs">{pendingPaymentCount}</Badge>
+              {!sidebarCollapsed && item.id === 'orders' && orderPendingPaymentCount > 0 && (
+                <Badge variant="destructive" className="ml-auto text-xs">{orderPendingPaymentCount}</Badge>
               )}
             </button>
           ))}
@@ -217,9 +361,9 @@ export default function ERPDashboard() {
           <div className="flex items-center gap-4">
             <Button variant="ghost" size="sm" className="relative">
               <Bell className="w-5 h-5" />
-              {(lowStockCount > 0 || pendingPaymentCount > 0) && (
+              {(lowStockCount > 0 || orderPendingPaymentCount > 0) && (
                 <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
-                  {lowStockCount + pendingPaymentCount}
+                  {lowStockCount + orderPendingPaymentCount}
                 </span>
               )}
             </Button>
@@ -236,62 +380,29 @@ export default function ERPDashboard() {
             <div className="space-y-6">
               {/* Stats Cards */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <Card>
-                  <CardContent className="pt-6">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm text-slate-500">客户总数</p>
-                        <p className="text-3xl font-bold text-slate-800">{mockCustomers.length}</p>
-                      </div>
-                      <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
-                        <Users className="w-6 h-6 text-blue-600" />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardContent className="pt-6">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm text-slate-500">订单总数</p>
-                        <p className="text-3xl font-bold text-slate-800">{mockOrders.length}</p>
-                      </div>
-                      <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center">
-                        <ShoppingCart className="w-6 h-6 text-green-600" />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardContent className="pt-6">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm text-slate-500">产品种类</p>
-                        <p className="text-3xl font-bold text-slate-800">{mockInventory.length}</p>
-                      </div>
-                      <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center">
-                        <Package className="w-6 h-6 text-purple-600" />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardContent className="pt-6">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm text-slate-500">本月销售额</p>
-                        <p className="text-3xl font-bold text-slate-800">10.7万</p>
-                      </div>
-                      <div className="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center">
-                        <Wallet className="w-6 h-6 text-orange-600" />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
+                {overviewCards.map(card => {
+                  const Icon = overviewCardIcons[card.icon];
+
+                  return (
+                    <Card key={card.key}>
+                      <CardContent className="pt-6">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-sm text-slate-500">{card.label}</p>
+                            <p className="text-3xl font-bold text-slate-800">{card.value}</p>
+                          </div>
+                          <div className={cn('w-12 h-12 rounded-xl flex items-center justify-center', card.iconWrapperClassName)}>
+                            <Icon className={cn('w-6 h-6', card.iconClassName)} />
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
               </div>
 
               {/* Alerts */}
-              {(lowStockCount > 0 || pendingPaymentCount > 0) && (
+              {(lowStockCount > 0 || orderPendingPaymentCount > 0) && (
                 <Card className="border-orange-200 bg-orange-50">
                   <CardHeader className="pb-2">
                     <CardTitle className="text-orange-700 flex items-center gap-2">
@@ -301,8 +412,8 @@ export default function ERPDashboard() {
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-2">
-                      {pendingPaymentCount > 0 && (
-                        <p className="text-orange-600">• 有 {pendingPaymentCount} 笔订单待收款</p>
+                      {orderPendingPaymentCount > 0 && (
+                        <p className="text-orange-600">• 有 {orderPendingPaymentCount} 笔订单待收款</p>
                       )}
                       {lowStockCount > 0 && (
                         <p className="text-orange-600">• 有 {lowStockCount} 种产品库存不足</p>
@@ -320,7 +431,7 @@ export default function ERPDashboard() {
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-3">
-                      {mockOrders.slice(0, 5).map(order => (
+                      {orders.slice(0, 5).map(order => (
                         <div key={order.id} className="flex items-center justify-between py-2 border-b border-slate-100 last:border-0">
                           <div>
                             <p className="font-medium text-slate-800">{order.orderNo}</p>
@@ -385,7 +496,7 @@ export default function ERPDashboard() {
                       </tr>
                     </thead>
                     <tbody>
-                      {mockCustomers.map(customer => (
+                      {customers.map(customer => (
                         <tr key={customer.id} className="border-b border-slate-100 hover:bg-slate-50">
                           <td className="py-3 px-4 font-medium">{customer.name}</td>
                           <td className="py-3 px-4 text-slate-600">{customer.company}</td>
@@ -409,7 +520,7 @@ export default function ERPDashboard() {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle>订单列表</CardTitle>
-                <Button>创建订单</Button>
+                <Button onClick={() => setCreateOrderOpen(true)}>创建订单</Button>
               </CardHeader>
               <CardContent>
                 <div className="overflow-x-auto">
@@ -425,7 +536,7 @@ export default function ERPDashboard() {
                       </tr>
                     </thead>
                     <tbody>
-                      {mockOrders.map(order => (
+                      {orders.map(order => (
                         <tr key={order.id} className="border-b border-slate-100 hover:bg-slate-50">
                           <td className="py-3 px-4 font-medium">{order.orderNo}</td>
                           <td className="py-3 px-4 text-slate-600">{order.customer}</td>
@@ -435,7 +546,9 @@ export default function ERPDashboard() {
                             <Badge className={statusColors[order.status]}>{order.status}</Badge>
                           </td>
                           <td className="py-3 px-4">
-                            <Button variant="ghost" size="sm">详情</Button>
+                            <Button variant="ghost" size="sm" asChild>
+                              <Link href={`/orders/${order.id}`}>详情</Link>
+                            </Button>
                           </td>
                         </tr>
                       ))}
@@ -572,6 +685,98 @@ export default function ERPDashboard() {
 
       {/* Dify Chat Panel */}
       {difyOpen && <DifyChat onClose={() => setDifyOpen(false)} />}
+
+      <Dialog open={createOrderOpen} onOpenChange={setCreateOrderOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>创建订单</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-2">
+            <div className="grid gap-2">
+              <label className="text-sm font-medium text-slate-700">客户</label>
+              <select
+                value={orderForm.customerId}
+                onChange={(e) => handleOrderFormChange('customerId', e.target.value)}
+                className="h-10 rounded-md border border-slate-200 bg-white px-3 text-sm outline-none"
+              >
+                {customers.map(customer => (
+                  <option key={customer.id} value={customer.id}>
+                    {customer.name} / {customer.company}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="grid gap-2">
+              <label className="text-sm font-medium text-slate-700">订单日期</label>
+              <Input
+                type="date"
+                value={orderForm.orderDate}
+                onChange={(e) => handleOrderFormChange('orderDate', e.target.value)}
+              />
+            </div>
+            <div className="grid gap-2">
+              <label className="text-sm font-medium text-slate-700">商品名称</label>
+              <Input
+                value={orderForm.productName}
+                onChange={(e) => handleOrderFormChange('productName', e.target.value)}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <label className="text-sm font-medium text-slate-700">数量</label>
+                <Input
+                  type="number"
+                  min="1"
+                  value={orderForm.quantity}
+                  onChange={(e) => handleOrderFormChange('quantity', e.target.value)}
+                />
+              </div>
+              <div className="grid gap-2">
+                <label className="text-sm font-medium text-slate-700">单价</label>
+                <Input
+                  type="number"
+                  min="0"
+                  value={orderForm.price}
+                  onChange={(e) => handleOrderFormChange('price', e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="grid gap-2">
+              <label className="text-sm font-medium text-slate-700">收货地址</label>
+              <Input
+                value={orderForm.shippingAddress}
+                onChange={(e) => handleOrderFormChange('shippingAddress', e.target.value)}
+              />
+            </div>
+            <div className="grid gap-2">
+              <label className="text-sm font-medium text-slate-700">状态</label>
+              <select
+                value={orderForm.status}
+                onChange={(e) => handleOrderFormChange('status', e.target.value)}
+                className="h-10 rounded-md border border-slate-200 bg-white px-3 text-sm outline-none"
+              >
+                {orderStatusOptions.map(status => (
+                  <option key={status} value={status}>
+                    {status}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-600">
+              订单金额：¥ {orderTotalAmount.toLocaleString()}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCreateOrderOpen(false)}>取消</Button>
+            <Button
+              onClick={handleCreateOrder}
+              disabled={!orderForm.productName || !orderForm.price || !orderForm.shippingAddress}
+            >
+              保存
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* AI Chat Panel */}
       {chatOpen && (
