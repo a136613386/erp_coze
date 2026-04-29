@@ -4,13 +4,28 @@ import { useState } from 'react';
 import { 
   Users, ShoppingCart, Package, Wallet, BarChart3, 
   Settings, Bell, ChevronLeft, ChevronRight, Bot,
-  X, Send, RefreshCw, AlertCircle, Rocket
+  X, Send, AlertCircle, Rocket, UserPlus, PlusCircle
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import DifyChat from '@/components/DifyChat';
 
@@ -23,8 +38,46 @@ interface ChatMessage {
   timestamp: string;
 }
 
+type CustomerLevel = 'VIP' | '普通' | '新客户';
+type OrderStatus = '已完成' | '已发货' | '待付款' | '已付款' | '已取消';
+
+interface Customer {
+  id: string;
+  name: string;
+  company: string;
+  phone: string;
+  level: CustomerLevel;
+  totalOrders: number;
+  totalAmount: number;
+}
+
+interface CustomerForm {
+  name: string;
+  company: string;
+  phone: string;
+  level: CustomerLevel;
+}
+
+interface Order {
+  id: string;
+  orderNo: string;
+  customer: string;
+  amount: number;
+  status: OrderStatus;
+  date: string;
+  items: number;
+}
+
+interface OrderForm {
+  customerId: string;
+  date: string;
+  amount: string;
+  status: OrderStatus;
+  items: string;
+}
+
 // 模拟数据
-const mockCustomers = [
+const mockCustomers: Customer[] = [
   { id: 'C001', name: '张三', company: '北京科技有限公司', phone: '13800138001', level: 'VIP', totalOrders: 2, totalAmount: 83000 },
   { id: 'C002', name: '李四', company: '上海贸易集团', phone: '13800138002', level: '普通', totalOrders: 2, totalAmount: 21500 },
   { id: 'C003', name: '王五', company: '广州制造业公司', phone: '13800138003', level: '新客户', totalOrders: 1, totalAmount: 40000 },
@@ -32,7 +85,7 @@ const mockCustomers = [
   { id: 'C005', name: '孙七', company: '成都软件园', phone: '13800138005', level: '普通', totalOrders: 0, totalAmount: 0 },
 ];
 
-const mockOrders = [
+const mockOrders: Order[] = [
   { id: 'ORD001', orderNo: 'ORD20240115001', customer: '陈明', amount: 53000, status: '已完成', date: '2024-01-15', items: 2 },
   { id: 'ORD002', orderNo: 'ORD20240120002', customer: '赵敏', amount: 14000, status: '已发货', date: '2024-01-20', items: 1 },
   { id: 'ORD003', orderNo: 'ORD20240201003', customer: '陈明', amount: 30000, status: '待付款', date: '2024-02-01', items: 2 },
@@ -79,6 +132,25 @@ const statusColors: Record<string, string> = {
 export default function ERPDashboard() {
   const [activeTab, setActiveTab] = useState<TabType>('dashboard');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [customers, setCustomers] = useState<Customer[]>(mockCustomers);
+  const [customerDialogOpen, setCustomerDialogOpen] = useState(false);
+  const [customerForm, setCustomerForm] = useState<CustomerForm>({
+    name: '',
+    company: '',
+    phone: '',
+    level: '新客户',
+  });
+  const [customerFormError, setCustomerFormError] = useState('');
+  const [orders, setOrders] = useState<Order[]>(mockOrders);
+  const [orderDialogOpen, setOrderDialogOpen] = useState(false);
+  const [orderForm, setOrderForm] = useState<OrderForm>({
+    customerId: mockCustomers[0]?.id ?? '',
+    date: new Date().toISOString().slice(0, 10),
+    amount: '',
+    status: '待付款',
+    items: '1',
+  });
+  const [orderFormError, setOrderFormError] = useState('');
   const [chatOpen, setChatOpen] = useState(false);
   const [difyOpen, setDifyOpen] = useState(false);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
@@ -99,6 +171,125 @@ export default function ERPDashboard() {
     { id: 'inventory', label: '库存管理', icon: Package },
     { id: 'finance', label: '财务管理', icon: Wallet },
   ];
+
+  const resetCustomerForm = () => {
+    setCustomerForm({
+      name: '',
+      company: '',
+      phone: '',
+      level: '新客户',
+    });
+    setCustomerFormError('');
+  };
+
+  const handleCustomerDialogChange = (open: boolean) => {
+    setCustomerDialogOpen(open);
+    if (!open) resetCustomerForm();
+  };
+
+  const handleAddCustomer = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    const name = customerForm.name.trim();
+    const company = customerForm.company.trim();
+    const phone = customerForm.phone.trim();
+
+    if (!name || !company || !phone) {
+      setCustomerFormError('请填写客户名称、公司和电话');
+      return;
+    }
+
+    if (!/^1\d{10}$/.test(phone)) {
+      setCustomerFormError('请输入 11 位手机号');
+      return;
+    }
+
+    const nextNumber =
+      Math.max(...customers.map(customer => Number(customer.id.replace('C', ''))), 0) + 1;
+    const newCustomer: Customer = {
+      id: `C${String(nextNumber).padStart(3, '0')}`,
+      name,
+      company,
+      phone,
+      level: customerForm.level,
+      totalOrders: 0,
+      totalAmount: 0,
+    };
+
+    setCustomers(prev => [...prev, newCustomer]);
+    setCustomerDialogOpen(false);
+    resetCustomerForm();
+  };
+
+  const resetOrderForm = () => {
+    setOrderForm({
+      customerId: customers[0]?.id ?? '',
+      date: new Date().toISOString().slice(0, 10),
+      amount: '',
+      status: '待付款',
+      items: '1',
+    });
+    setOrderFormError('');
+  };
+
+  const handleOrderDialogChange = (open: boolean) => {
+    setOrderDialogOpen(open);
+    if (!open) resetOrderForm();
+  };
+
+  const handleCreateOrder = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    const selectedCustomer = customers.find(customer => customer.id === orderForm.customerId);
+    const amount = Number(orderForm.amount);
+    const items = Number(orderForm.items);
+
+    if (!selectedCustomer) {
+      setOrderFormError('请选择客户');
+      return;
+    }
+
+    if (!orderForm.date) {
+      setOrderFormError('请选择订单日期');
+      return;
+    }
+
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setOrderFormError('请输入大于 0 的订单金额');
+      return;
+    }
+
+    if (!Number.isInteger(items) || items <= 0) {
+      setOrderFormError('请输入大于 0 的商品项数');
+      return;
+    }
+
+    const nextNumber =
+      Math.max(...orders.map(order => Number(order.id.replace('ORD', ''))), 0) + 1;
+    const compactDate = orderForm.date.replaceAll('-', '');
+    const newOrder: Order = {
+      id: `ORD${String(nextNumber).padStart(3, '0')}`,
+      orderNo: `ORD${compactDate}${String(nextNumber).padStart(3, '0')}`,
+      customer: selectedCustomer.name,
+      amount,
+      status: orderForm.status,
+      date: orderForm.date,
+      items,
+    };
+
+    setOrders(prev => [newOrder, ...prev]);
+    setCustomers(prev => prev.map(customer => (
+      customer.id === selectedCustomer.id
+        ? {
+            ...customer,
+            totalOrders: customer.totalOrders + 1,
+            totalAmount: customer.totalAmount + amount,
+          }
+        : customer
+    )));
+    setOrderDialogOpen(false);
+    resetOrderForm();
+  };
 
   const handleChat = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -146,7 +337,7 @@ export default function ERPDashboard() {
   };
 
   const lowStockCount = mockInventory.filter(p => p.status === 'low').length;
-  const pendingPaymentCount = mockOrders.filter(o => o.status === '待付款').length;
+  const pendingPaymentCount = orders.filter(o => o.status === '待付款').length;
 
   return (
     <div className="min-h-screen bg-slate-100 flex">
@@ -241,7 +432,7 @@ export default function ERPDashboard() {
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="text-sm text-slate-500">客户总数</p>
-                        <p className="text-3xl font-bold text-slate-800">{mockCustomers.length}</p>
+                        <p className="text-3xl font-bold text-slate-800">{customers.length}</p>
                       </div>
                       <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
                         <Users className="w-6 h-6 text-blue-600" />
@@ -254,7 +445,7 @@ export default function ERPDashboard() {
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="text-sm text-slate-500">订单总数</p>
-                        <p className="text-3xl font-bold text-slate-800">{mockOrders.length}</p>
+                        <p className="text-3xl font-bold text-slate-800">{orders.length}</p>
                       </div>
                       <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center">
                         <ShoppingCart className="w-6 h-6 text-green-600" />
@@ -320,7 +511,7 @@ export default function ERPDashboard() {
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-3">
-                      {mockOrders.slice(0, 5).map(order => (
+                      {orders.slice(0, 5).map(order => (
                         <div key={order.id} className="flex items-center justify-between py-2 border-b border-slate-100 last:border-0">
                           <div>
                             <p className="font-medium text-slate-800">{order.orderNo}</p>
@@ -369,7 +560,10 @@ export default function ERPDashboard() {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle>客户列表</CardTitle>
-                <Button>添加客户</Button>
+                <Button onClick={() => setCustomerDialogOpen(true)}>
+                  <UserPlus className="w-4 h-4" />
+                  添加客户
+                </Button>
               </CardHeader>
               <CardContent>
                 <div className="overflow-x-auto">
@@ -385,7 +579,7 @@ export default function ERPDashboard() {
                       </tr>
                     </thead>
                     <tbody>
-                      {mockCustomers.map(customer => (
+                      {customers.map(customer => (
                         <tr key={customer.id} className="border-b border-slate-100 hover:bg-slate-50">
                           <td className="py-3 px-4 font-medium">{customer.name}</td>
                           <td className="py-3 px-4 text-slate-600">{customer.company}</td>
@@ -409,7 +603,10 @@ export default function ERPDashboard() {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle>订单列表</CardTitle>
-                <Button>创建订单</Button>
+                <Button onClick={() => setOrderDialogOpen(true)}>
+                  <PlusCircle className="w-4 h-4" />
+                  创建订单
+                </Button>
               </CardHeader>
               <CardContent>
                 <div className="overflow-x-auto">
@@ -425,7 +622,7 @@ export default function ERPDashboard() {
                       </tr>
                     </thead>
                     <tbody>
-                      {mockOrders.map(order => (
+                      {orders.map(order => (
                         <tr key={order.id} className="border-b border-slate-100 hover:bg-slate-50">
                           <td className="py-3 px-4 font-medium">{order.orderNo}</td>
                           <td className="py-3 px-4 text-slate-600">{order.customer}</td>
@@ -547,6 +744,223 @@ export default function ERPDashboard() {
           )}
         </div>
       </main>
+
+      <Dialog open={customerDialogOpen} onOpenChange={handleCustomerDialogChange}>
+        <DialogContent className="sm:max-w-[520px]">
+          <DialogHeader>
+            <DialogTitle>添加客户</DialogTitle>
+            <DialogDescription>
+              录入客户基础信息，保存后会展示在客户列表中。
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleAddCustomer} className="space-y-4">
+            <div className="grid gap-2">
+              <label htmlFor="customer-name" className="text-sm font-medium text-slate-700">
+                客户名称
+              </label>
+              <Input
+                id="customer-name"
+                value={customerForm.name}
+                onChange={(e) => {
+                  setCustomerForm(prev => ({ ...prev, name: e.target.value }));
+                  setCustomerFormError('');
+                }}
+                placeholder="请输入客户姓名"
+              />
+            </div>
+            <div className="grid gap-2">
+              <label htmlFor="customer-company" className="text-sm font-medium text-slate-700">
+                公司
+              </label>
+              <Input
+                id="customer-company"
+                value={customerForm.company}
+                onChange={(e) => {
+                  setCustomerForm(prev => ({ ...prev, company: e.target.value }));
+                  setCustomerFormError('');
+                }}
+                placeholder="请输入公司名称"
+              />
+            </div>
+            <div className="grid gap-2">
+              <label htmlFor="customer-phone" className="text-sm font-medium text-slate-700">
+                电话
+              </label>
+              <Input
+                id="customer-phone"
+                value={customerForm.phone}
+                onChange={(e) => {
+                  setCustomerForm(prev => ({ ...prev, phone: e.target.value }));
+                  setCustomerFormError('');
+                }}
+                placeholder="请输入 11 位手机号"
+              />
+            </div>
+            <div className="grid gap-2">
+              <label className="text-sm font-medium text-slate-700">
+                等级
+              </label>
+              <Select
+                value={customerForm.level}
+                onValueChange={(value: CustomerLevel) => {
+                  setCustomerForm(prev => ({ ...prev, level: value }));
+                  setCustomerFormError('');
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="选择客户等级" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="新客户">新客户</SelectItem>
+                  <SelectItem value="普通">普通</SelectItem>
+                  <SelectItem value="VIP">VIP</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {customerFormError && (
+              <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-600">
+                {customerFormError}
+              </p>
+            )}
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => handleCustomerDialogChange(false)}
+              >
+                取消
+              </Button>
+              <Button type="submit">保存客户</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={orderDialogOpen} onOpenChange={handleOrderDialogChange}>
+        <DialogContent className="sm:max-w-[560px]">
+          <DialogHeader>
+            <DialogTitle>创建订单</DialogTitle>
+            <DialogDescription>
+              选择客户并录入订单信息，保存后会展示在订单列表中。
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleCreateOrder} className="space-y-4">
+            <div className="grid gap-2">
+              <label className="text-sm font-medium text-slate-700">
+                客户
+              </label>
+              <Select
+                value={orderForm.customerId}
+                onValueChange={(value) => {
+                  setOrderForm(prev => ({ ...prev, customerId: value }));
+                  setOrderFormError('');
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="选择客户" />
+                </SelectTrigger>
+                <SelectContent>
+                  {customers.map(customer => (
+                    <SelectItem key={customer.id} value={customer.id}>
+                      {customer.name} - {customer.company}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="grid gap-2">
+                <label htmlFor="order-date" className="text-sm font-medium text-slate-700">
+                  日期
+                </label>
+                <Input
+                  id="order-date"
+                  type="date"
+                  value={orderForm.date}
+                  onChange={(e) => {
+                    setOrderForm(prev => ({ ...prev, date: e.target.value }));
+                    setOrderFormError('');
+                  }}
+                />
+              </div>
+              <div className="grid gap-2">
+                <label htmlFor="order-status" className="text-sm font-medium text-slate-700">
+                  状态
+                </label>
+                <Select
+                  value={orderForm.status}
+                  onValueChange={(value: OrderStatus) => {
+                    setOrderForm(prev => ({ ...prev, status: value }));
+                    setOrderFormError('');
+                  }}
+                >
+                  <SelectTrigger id="order-status">
+                    <SelectValue placeholder="选择状态" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="待付款">待付款</SelectItem>
+                    <SelectItem value="已付款">已付款</SelectItem>
+                    <SelectItem value="已发货">已发货</SelectItem>
+                    <SelectItem value="已完成">已完成</SelectItem>
+                    <SelectItem value="已取消">已取消</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="grid gap-2">
+                <label htmlFor="order-amount" className="text-sm font-medium text-slate-700">
+                  金额
+                </label>
+                <Input
+                  id="order-amount"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={orderForm.amount}
+                  onChange={(e) => {
+                    setOrderForm(prev => ({ ...prev, amount: e.target.value }));
+                    setOrderFormError('');
+                  }}
+                  placeholder="请输入订单金额"
+                />
+              </div>
+              <div className="grid gap-2">
+                <label htmlFor="order-items" className="text-sm font-medium text-slate-700">
+                  商品项数
+                </label>
+                <Input
+                  id="order-items"
+                  type="number"
+                  min="1"
+                  step="1"
+                  value={orderForm.items}
+                  onChange={(e) => {
+                    setOrderForm(prev => ({ ...prev, items: e.target.value }));
+                    setOrderFormError('');
+                  }}
+                  placeholder="请输入商品项数"
+                />
+              </div>
+            </div>
+            {orderFormError && (
+              <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-600">
+                {orderFormError}
+              </p>
+            )}
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => handleOrderDialogChange(false)}
+              >
+                取消
+              </Button>
+              <Button type="submit">保存订单</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       {/* AI Chat Button - ERP智能助手 */}
       <button
