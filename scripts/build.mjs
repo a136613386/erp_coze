@@ -15,6 +15,7 @@ function spawnCommand(command, args, options = {}) {
   });
 }
 
+
 function run(command, args, label) {
   return new Promise((resolve, reject) => {
     console.log(label);
