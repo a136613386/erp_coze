@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { 
   Users, ShoppingCart, Package, Wallet, BarChart3, 
   Settings, Bell, ChevronLeft, ChevronRight, Bot,
-  X, Send, RefreshCw, AlertCircle, Rocket
+  X, Send, RefreshCw, AlertCircle, MessageSquare
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -25,20 +25,20 @@ interface ChatMessage {
 
 // 模拟数据
 const mockCustomers = [
-  { id: 'C001', name: '张三', company: '北京科技有限公司', phone: '13800138001', level: 'VIP', totalOrders: 2, totalAmount: 83000 },
-  { id: 'C002', name: '李四', company: '上海贸易集团', phone: '13800138002', level: '普通', totalOrders: 2, totalAmount: 21500 },
-  { id: 'C003', name: '王五', company: '广州制造业公司', phone: '13800138003', level: '新客户', totalOrders: 1, totalAmount: 40000 },
-  { id: 'C004', name: '赵六', company: '深圳电子科技', phone: '13800138004', level: 'VIP', totalOrders: 1, totalAmount: 65000 },
-  { id: 'C005', name: '孙七', company: '成都软件园', phone: '13800138005', level: '普通', totalOrders: 0, totalAmount: 0 },
+  { id: 'C001', name: '黎明', company: '北京科技有限公司', phone: '13800138001', level: 'VIP', totalOrders: 2, totalAmount: 83000 },
+  { id: 'C002', name: '王芳', company: '上海贸易集团', phone: '13800138002', level: '普通', totalOrders: 2, totalAmount: 21500 },
+  { id: 'C003', name: '辰辰', company: '广州制造业公司', phone: '13800138003', level: '新客户', totalOrders: 1, totalAmount: 40000 },
+  { id: 'C004', name: '王凡', company: '深圳电子科技', phone: '13800138004', level: 'VIP', totalOrders: 1, totalAmount: 65000 },
+  { id: 'C005', name: '孙菊', company: '成都软件园', phone: '13800138005', level: '普通', totalOrders: 0, totalAmount: 0 },
 ];
 
 const mockOrders = [
-  { id: 'ORD001', orderNo: 'ORD20240115001', customer: '张三', amount: 53000, status: '已完成', date: '2024-01-15', items: 2 },
-  { id: 'ORD002', orderNo: 'ORD20240120002', customer: '李四', amount: 14000, status: '已发货', date: '2024-01-20', items: 1 },
-  { id: 'ORD003', orderNo: 'ORD20240201003', customer: '张三', amount: 30000, status: '待付款', date: '2024-02-01', items: 2 },
-  { id: 'ORD004', orderNo: 'ORD20240205004', customer: '王五', amount: 40000, status: '已付款', date: '2024-02-05', items: 1 },
-  { id: 'ORD005', orderNo: 'ORD20240210005', customer: '赵六', amount: 65000, status: '待付款', date: '2024-02-10', items: 2 },
-  { id: 'ORD006', orderNo: 'ORD20240212006', customer: '李四', amount: 7500, status: '已取消', date: '2024-02-12', items: 1 },
+  { id: 'ORD001', orderNo: 'ORD20240115001', customer: '黎明', amount: 53000, status: '已完成', date: '2024-01-15', items: 2 },
+  { id: 'ORD002', orderNo: 'ORD20240120002', customer: '王芳', amount: 14000, status: '已发货', date: '2024-01-20', items: 1 },
+  { id: 'ORD003', orderNo: 'ORD20240201003', customer: '辰辰', amount: 30000, status: '待付款', date: '2024-02-01', items: 2 },
+  { id: 'ORD004', orderNo: 'ORD20240205004', customer: '王凡', amount: 40000, status: '已付款', date: '2024-02-05', items: 1 },
+  { id: 'ORD005', orderNo: 'ORD20240210005', customer: '孙菊', amount: 65000, status: '待付款', date: '2024-02-10', items: 2 },
+  { id: 'ORD006', orderNo: 'ORD20240212006', customer: '王芳', amount: 7500, status: '已取消', date: '2024-02-12', items: 1 },
 ];
 
 const mockInventory = [
@@ -55,11 +55,11 @@ const mockInventory = [
 ];
 
 const mockFinance = [
-  { id: 'F001', type: '收款', amount: 53000, customer: '张三', method: '银行转账', status: '已确认', date: '2024-01-17' },
-  { id: 'F002', type: '收款', amount: 40000, customer: '王五', method: '银行转账', status: '已确认', date: '2024-02-06' },
+  { id: 'F001', type: '收款', amount: 53000, customer: '黎明', method: '银行转账', status: '已确认', date: '2024-01-17' },
+  { id: 'F002', type: '收款', amount: 40000, customer: '王凡', method: '银行转账', status: '已确认', date: '2024-02-06' },
   { id: 'F003', type: '付款', amount: 126000, supplier: '联想科技', method: '银行转账', status: '已确认', date: '2024-01-05' },
   { id: 'F004', type: '付款', amount: 11000, supplier: '戴尔中国', method: '银行转账', status: '已确认', date: '2024-01-08' },
-  { id: 'F005', type: '收款', amount: 14000, customer: '李四', method: '微信', status: '已确认', date: '2024-01-21' },
+  { id: 'F005', type: '收款', amount: 14000, customer: '晨晨', method: '微信', status: '已确认', date: '2024-01-21' },
 ];
 
 const statusColors: Record<string, string> = {
@@ -152,7 +152,7 @@ export default function ERPDashboard() {
     <div className="min-h-screen bg-slate-100 flex">
       {/* Sidebar */}
       <aside className={cn(
-        'bg-slate-800 text-white transition-all duration-300 flex flex-col',
+        'bg-slate-800 text-white transition-Hall duration-300 flex flex-col',
         sidebarCollapsed ? 'w-16' : 'w-64'
       )}>
         {/* Logo */}
@@ -162,7 +162,7 @@ export default function ERPDashboard() {
               <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center">
                 <BarChart3 className="w-5 h-5" />
               </div>
-              <span className="font-bold">ERP系统</span>
+              <span className="font-bold">天商ERP系统</span>
             </div>
           )}
           <Button
@@ -567,7 +567,7 @@ export default function ERPDashboard() {
           difyOpen && 'hidden'
         )}
       >
-        <Rocket className="w-7 h-7" />
+        <MessageSquare className="w-7 h-7" />
       </button>
 
       {/* Dify Chat Panel */}

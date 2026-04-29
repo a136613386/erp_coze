@@ -9,7 +9,7 @@ export const metadata: Metadata = {
   },
   description: '面向小微企业的ERP教学演示系统，支持客户管理、订单管理、库存管理、财务管理等核心功能，以及AI智能助手对话交互。',
   keywords: [
-    'ERP系统',
+    '天商ERP系统',
     '企业管理',
     '客户管理',
     '订单管理',
