@@ -2,6 +2,8 @@ import { NextRequest } from 'next/server';
 
 export const runtime = 'nodejs';
 
+
+
 const DIFY_HOST = 'http://192.168.218.150';
 const DIFY_API_URL = `${DIFY_HOST}/v1/chat-messages`;
 const DIFY_API_KEY = 'app-a6vQjXap5eel0c5noYcEBlZC';
