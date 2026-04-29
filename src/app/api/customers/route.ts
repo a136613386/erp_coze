@@ -26,6 +26,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: error.message }, { status: 409 });
     }
 
+    if (
+      typeof error === 'object' &&
+      error !== null &&
+      'code' in error &&
+      error.code === 'ER_DUP_ENTRY'
+    ) {
+      return NextResponse.json({ message: '该手机号已存在客户' }, { status: 409 });
+    }
+
     return NextResponse.json(
       { message: '新增客户失败，请稍后重试' },
       { status: 500 }
