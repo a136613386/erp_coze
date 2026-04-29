@@ -82,6 +82,7 @@ export default function ERPDashboard() {
   const [chatOpen, setChatOpen] = useState(false);
   const [difyOpen, setDifyOpen] = useState(false);
 
+  // ‘false’：隐藏coze助手开关；‘true’：显示coze助手开关
   const showErpAssistant = false;
 
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
