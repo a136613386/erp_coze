@@ -282,11 +282,11 @@ export default async function PostsPage() {
     </div>
   );
 }
-```
+```[tsconfig.json](tsconfig.json)
 
 **客户端组件**
 
-```tsx
+```
 'use client';
 
 import { useEffect, useState } from 'react';

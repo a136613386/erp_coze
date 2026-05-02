@@ -1,19 +1,17 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ArrowLeft, CalendarDays, MapPin, Package2, UserRound } from 'lucide-react';
+
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   formatCurrency,
-  getOrderById,
-  mergeOrderRow,
+  mergeOrderDetail,
   readOrderOverrides,
-  resolveOrderDetail,
   statusColors,
-  type OrderRow,
-  type ResolvedOrderDetail,
+  type OrderDetailRecord,
 } from '@/lib/order-detail-data';
 
 interface Props {
@@ -21,22 +19,59 @@ interface Props {
 }
 
 export default function OrderDetailRoute({ orderId }: Props) {
-  const baseOrder = useMemo(() => getOrderById(orderId), [orderId]);
-  const [order, setOrder] = useState<OrderRow | null>(baseOrder);
-  const [detail, setDetail] = useState<ResolvedOrderDetail | null>(
-    baseOrder ? resolveOrderDetail(baseOrder, readOrderOverrides()[baseOrder.id]) : null
-  );
+  const [order, setOrder] = useState<OrderDetailRecord | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!baseOrder) return;
+    let cancelled = false;
 
-    const override = readOrderOverrides()[baseOrder.id];
-    const nextOrder = mergeOrderRow(baseOrder, override);
-    setOrder(nextOrder);
-    setDetail(resolveOrderDetail(nextOrder, override));
-  }, [baseOrder]);
+    async function loadOrder() {
+      setLoading(true);
 
-  if (!baseOrder || !order || !detail) {
+      try {
+        const response = await fetch(`/api/orders/${orderId}`);
+        if (!response.ok) {
+          if (!cancelled) {
+            setOrder(null);
+          }
+          return;
+        }
+
+        const data = (await response.json()) as { order?: OrderDetailRecord };
+        const nextOrder = data.order ? mergeOrderDetail(data.order, readOrderOverrides()[data.order.id]) : null;
+
+        if (!cancelled) {
+          setOrder(nextOrder);
+        }
+      } catch {
+        if (!cancelled) {
+          setOrder(null);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+
+    void loadOrder();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [orderId]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-100 p-6">
+        <div className="mx-auto max-w-4xl rounded-3xl border border-slate-200 bg-white p-10 text-center shadow-sm">
+          <p className="text-sm text-slate-500">订单详情加载中...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!order) {
     return (
       <div className="min-h-screen bg-slate-100 p-6">
         <div className="mx-auto max-w-4xl rounded-3xl border border-slate-200 bg-white p-10 text-center shadow-sm">
@@ -49,7 +84,7 @@ export default function OrderDetailRoute({ orderId }: Props) {
     );
   }
 
-  const itemCount = detail.items.reduce((sum, item) => sum + item.quantity, 0);
+  const itemCount = order.detailItems.reduce((sum, item) => sum + item.quantity, 0);
 
   return (
     <div className="min-h-screen bg-slate-100">
@@ -79,7 +114,7 @@ export default function OrderDetailRoute({ orderId }: Props) {
                 </span>
                 <span className="inline-flex items-center gap-1">
                   <UserRound className="h-4 w-4" />
-                  客户：{order.customer}
+                  客户：{order.customer} / {order.customerId}
                 </span>
                 <span className="inline-flex items-center gap-1">
                   <Package2 className="h-4 w-4" />
@@ -105,16 +140,24 @@ export default function OrderDetailRoute({ orderId }: Props) {
                 <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
                   <p className="text-sm text-slate-500">客户名称</p>
                   <p className="mt-1 font-medium text-slate-900">
-                    {detail.contactName} / {detail.company}
+                    {order.contactName} / {order.company}
                   </p>
                 </div>
                 <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
                   <p className="text-sm text-slate-500">联系电话</p>
-                  <p className="mt-1 font-medium text-slate-900">{detail.phone}</p>
+                  <p className="mt-1 font-medium text-slate-900">{order.phone}</p>
+                </div>
+                <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+                  <p className="text-sm text-slate-500">客户 ID</p>
+                  <p className="mt-1 font-medium text-slate-900">{order.customerId}</p>
+                </div>
+                <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+                  <p className="text-sm text-slate-500">销售负责人</p>
+                  <p className="mt-1 font-medium text-slate-900">{order.salesperson}</p>
                 </div>
                 <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4 md:col-span-2">
                   <p className="text-sm text-slate-500">收货地址</p>
-                  <p className="mt-1 font-medium text-slate-900">{detail.address}</p>
+                  <p className="mt-1 font-medium text-slate-900">{order.address}</p>
                 </div>
               </CardContent>
             </Card>
@@ -128,20 +171,22 @@ export default function OrderDetailRoute({ orderId }: Props) {
                   <table className="w-full">
                     <thead>
                       <tr className="border-b border-slate-200">
+                        <th className="px-3 py-3 text-left text-sm font-medium text-slate-500">商品ID</th>
                         <th className="px-3 py-3 text-left text-sm font-medium text-slate-500">商品名称</th>
-                        <th className="px-3 py-3 text-left text-sm font-medium text-slate-500">规格</th>
+                        <th className="px-3 py-3 text-left text-sm font-medium text-slate-500">规格型号</th>
                         <th className="px-3 py-3 text-left text-sm font-medium text-slate-500">数量</th>
-                        <th className="px-3 py-3 text-left text-sm font-medium text-slate-500">单价</th>
-                        <th className="px-3 py-3 text-right text-sm font-medium text-slate-500">小计</th>
+                        <th className="px-3 py-3 text-left text-sm font-medium text-slate-500">成交单价</th>
+                        <th className="px-3 py-3 text-right text-sm font-medium text-slate-500">小计金额</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {detail.items.map(item => (
-                        <tr key={`${order.id}-${item.name}`} className="border-b border-slate-100 last:border-0">
-                          <td className="px-3 py-4 font-medium text-slate-900">{item.name}</td>
+                      {order.detailItems.map((item) => (
+                        <tr key={`${order.id}-${item.productId}-${item.productName}`} className="border-b border-slate-100 last:border-0">
+                          <td className="px-3 py-4 font-mono text-sm text-slate-700">{item.productId}</td>
+                          <td className="px-3 py-4 font-medium text-slate-900">{item.productName}</td>
                           <td className="px-3 py-4 text-slate-600">{item.spec}</td>
                           <td className="px-3 py-4 text-slate-600">{item.quantity}</td>
-                          <td className="px-3 py-4 text-slate-600">{formatCurrency(item.price)}</td>
+                          <td className="px-3 py-4 text-slate-600">{formatCurrency(item.unitPrice)}</td>
                           <td className="px-3 py-4 text-right font-medium text-slate-900">{formatCurrency(item.subtotal)}</td>
                         </tr>
                       ))}
@@ -175,7 +220,13 @@ export default function OrderDetailRoute({ orderId }: Props) {
                     <MapPin className="h-4 w-4" />
                     配送地址
                   </div>
-                  <p className="mt-2 text-sm leading-6 text-slate-700">{detail.address}</p>
+                  <p className="mt-2 text-sm leading-6 text-slate-700">{order.address}</p>
+                </div>
+                <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4 text-sm text-slate-700">
+                  <p>物流公司：{order.shippingCompany}</p>
+                  <p className="mt-2">物流单号：{order.trackingNo}</p>
+                  <p className="mt-2">付款方式：{order.paymentMethod}</p>
+                  <p className="mt-2">发票抬头：{order.invoiceTitle}</p>
                 </div>
               </CardContent>
             </Card>

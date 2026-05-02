@@ -5,19 +5,30 @@ export interface DashboardOverviewMetrics {
   monthlySales: number;
 }
 
-export interface DashboardOverviewRepository {
-  getMetrics(): Promise<DashboardOverviewMetrics>;
+export interface DashboardRecentOrder {
+  id: string;
+  orderNo: string;
+  customer: string;
+  amount: number;
+  status: '已完成' | '已发货' | '待付款' | '已付款' | '已取消';
+  date: string;
 }
 
-export interface DashboardOverviewSource {
-  customers: Array<unknown>;
-  orders: Array<unknown>;
-  products: Array<unknown>;
-  financeRecords: Array<{
-    type: string;
-    status: string;
-    amount: number;
-  }>;
+export interface DashboardLowStockItem {
+  id: string;
+  name: string;
+  stock: number;
+  safeStock: number;
+  unit: string;
+  status: '正常' | '库存不足';
+}
+
+export interface DashboardOverviewPayload {
+  metrics: DashboardOverviewMetrics;
+  pendingPaymentCount: number;
+  lowStockCount: number;
+  recentOrders: DashboardRecentOrder[];
+  lowStockItems: DashboardLowStockItem[];
 }
 
 export type DashboardOverviewCardKey =
@@ -39,26 +50,9 @@ export function createDashboardOverviewMetrics(metrics: DashboardOverviewMetrics
   return metrics;
 }
 
-export function createDashboardOverviewRepository(
-  source: DashboardOverviewSource
-): DashboardOverviewRepository {
-  return {
-    async getMetrics() {
-      return createDashboardOverviewMetrics({
-        customerTotal: source.customers.length,
-        orderTotal: source.orders.length,
-        productTotal: source.products.length,
-        monthlySales: source.financeRecords
-          .filter(record => record.type === '收款' && record.status === '已确认')
-          .reduce((total, record) => total + record.amount, 0),
-      });
-    },
-  };
-}
-
 export function formatOverviewAmount(amount: number): string {
   if (amount >= 10000) {
-    const value = Math.round((amount / 1000)) / 10;
+    const value = Math.round(amount / 1000) / 10;
     return `${value}万`;
   }
 

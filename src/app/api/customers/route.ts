@@ -1,11 +1,16 @@
 import { NextResponse } from 'next/server';
 import { ZodError } from 'zod';
 
+import { internalServerError } from '@/lib/api-error';
 import { createCustomer, getCustomers } from '@/lib/customer-store';
 
 export async function GET() {
-  const customers = await getCustomers();
-  return NextResponse.json({ customers });
+  try {
+    const customers = await getCustomers();
+    return NextResponse.json({ customers });
+  } catch (error) {
+    return internalServerError(error, '读取客户数据失败');
+  }
 }
 
 export async function POST(request: Request) {
@@ -35,9 +40,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: '该手机号已存在客户' }, { status: 409 });
     }
 
-    return NextResponse.json(
-      { message: '新增客户失败，请稍后重试' },
-      { status: 500 }
-    );
+    return internalServerError(error, '新增客户失败，请稍后重试');
   }
 }

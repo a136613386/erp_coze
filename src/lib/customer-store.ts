@@ -16,6 +16,8 @@ type CustomerRow = RowDataPacket & {
   company_name: string;
   phone: string;
   level: string;
+  total_orders: number | null;
+  total_amount: number | string | null;
   create_time: Date | string;
   update_time: Date | string;
 };
@@ -48,20 +50,35 @@ function mapRowToCustomer(row: CustomerRow): CustomerListItem {
     company: row.company_name,
     phone: row.phone,
     level: levelFromDbMap[row.level] ?? '新客户',
-    totalOrders: 0,
-    totalAmount: 0,
+    totalOrders: Number(row.total_orders ?? 0),
+    totalAmount: Number(row.total_amount ?? 0),
     createdAt: normalizeTime(row.create_time),
     updatedAt: normalizeTime(row.update_time),
   };
 }
 
+const customerSelectSql = `
+  SELECT
+    c.id,
+    c.customer_name,
+    c.company_name,
+    c.phone,
+    c.level,
+    COUNT(o.id) AS total_orders,
+    COALESCE(SUM(o.amount), 0) AS total_amount,
+    c.create_time,
+    c.update_time
+  FROM customer_t c
+  LEFT JOIN order_t o ON o.customer_id = c.id
+`;
+
 export async function getCustomers(): Promise<CustomerListItem[]> {
   const db = getDb();
   const [rows] = await db.query<CustomerRow[]>(
     `
-      SELECT id, customer_name, company_name, phone, level, create_time, update_time
-      FROM customer_t
-      ORDER BY create_time DESC, id DESC
+      ${customerSelectSql}
+      GROUP BY c.id, c.customer_name, c.company_name, c.phone, c.level, c.create_time, c.update_time
+      ORDER BY c.create_time DESC, c.id DESC
     `
   );
 
@@ -91,9 +108,9 @@ export async function createCustomer(input: CreateCustomerInput): Promise<Custom
 
   const [rows] = await db.query<CustomerRow[]>(
     `
-      SELECT id, customer_name, company_name, phone, level, create_time, update_time
-      FROM customer_t
-      WHERE id = ?
+      ${customerSelectSql}
+      WHERE c.id = ?
+      GROUP BY c.id, c.customer_name, c.company_name, c.phone, c.level, c.create_time, c.update_time
       LIMIT 1
     `,
     [result.insertId]

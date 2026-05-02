@@ -2,11 +2,13 @@
 
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import type { DateRange } from 'react-day-picker';
+import { zhCN } from 'date-fns/locale';
 import { 
   Users, ShoppingCart, Package, Wallet, BarChart3, 
   Settings, Bell, ChevronLeft, ChevronRight, Bot,
-  X, AlertCircle, Rocket, Send
+  X, AlertCircle, Rocket, Send, Download, CalendarDays, CircleX
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,16 +16,27 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
   createDashboardOverviewCards,
   createDashboardOverviewMetrics,
-  createDashboardOverviewRepository,
   type DashboardOverviewCard,
   type DashboardOverviewMetrics,
   type DashboardOverviewCardKey,
+  type DashboardOverviewPayload,
 } from '@/lib/dashboard-overview';
 import { cn } from '@/lib/utils';
-import { mergeOrderRow, readOrderOverrides } from '@/lib/order-detail-data';
+import {
+  formatCurrency,
+  mergeOrderRow,
+  normalizeOrderStatus,
+  orderStatusOptions,
+  readOrderOverrides,
+  writeOrderOverride,
+  writeOrderOverrides,
+  type OrderRow,
+} from '@/lib/order-detail-data';
 import DifyChat from '@/components/DifyChat';
 
 type TabType = 'customers' | 'orders' | 'inventory' | 'finance' | 'dashboard';
@@ -41,7 +54,7 @@ interface OrderFormState {
   productName: string;
   quantity: string;
   price: string;
-  status: string;
+  status: OrderRow['status'];
   shippingAddress: string;
 }
 
@@ -55,30 +68,13 @@ interface CustomerRow {
   totalAmount: number;
 }
 
-const initialCustomers: CustomerRow[] = [
-  { id: 'C001', name: '张三', company: '北京科技有限公司', phone: '13800138001', level: 'VIP', totalOrders: 2, totalAmount: 83000 },
-  { id: 'C002', name: '李四', company: '上海贸易集团', phone: '13800138002', level: '普通', totalOrders: 2, totalAmount: 21500 },
-  { id: 'C003', name: '王五', company: '广州制造业公司', phone: '13800138003', level: '新客户', totalOrders: 1, totalAmount: 40000 },
-  { id: 'C004', name: '赵六', company: '深圳电子科技', phone: '13800138004', level: 'VIP', totalOrders: 1, totalAmount: 65000 },
-  { id: 'C005', name: '孙七', company: '成都软件园', phone: '13800138005', level: '普通', totalOrders: 0, totalAmount: 0 },
-];
+interface ApiLoadError {
+  source: string;
+  message: string;
+  status?: number;
+}
 
-const mockOrders = [
-  { id: 'ORD001', orderNo: 'ORD20240115001', customer: '张三', amount: 53000, status: '已完成', date: '2024-01-15', items: 2 },
-  { id: 'ORD002', orderNo: 'ORD20240120002', customer: '李四', amount: 14000, status: '已发货', date: '2024-01-20', items: 1 },
-  { id: 'ORD003', orderNo: 'ORD20240201003', customer: '张三', amount: 30000, status: '待付款', date: '2024-02-01', items: 2 },
-  { id: 'ORD004', orderNo: 'ORD20240205004', customer: '王五', amount: 40000, status: '已付款', date: '2024-02-05', items: 1 },
-  { id: 'ORD005', orderNo: 'ORD20240210005', customer: '赵六', amount: 65000, status: '待付款', date: '2024-02-10', items: 2 },
-  { id: 'ORD006', orderNo: 'ORD20240212006', customer: '李四', amount: 7500, status: '已取消', date: '2024-02-12', items: 1 },
-];
-
-type OrderRow = (typeof mockOrders)[number] & {
-  shippingAddress?: string;
-  productName?: string;
-};
-
-const orderStatusOptions = Array.from(new Set(mockOrders.map(order => order.status)));
-const pendingOrderStatus = mockOrders[2].status;
+const pendingOrderStatus: OrderRow['status'] = '待付款';
 
 const mockInventory = [
   { id: 'P001', name: '笔记本电脑', code: 'IT001', stock: 25, safeStock: 10, price: 5000, unit: '台', status: 'normal' },
@@ -122,18 +118,98 @@ const overviewCardIcons: Record<DashboardOverviewCardKey, typeof Users> = {
   monthlySales: Wallet,
 };
 
+const overviewCardTargets: Record<DashboardOverviewCardKey, TabType> = {
+  customerTotal: 'customers',
+  orderTotal: 'orders',
+  productTotal: 'inventory',
+  monthlySales: 'finance',
+};
+
+const emptyDashboardOverview: DashboardOverviewPayload = {
+  metrics: createDashboardOverviewMetrics({
+    customerTotal: 0,
+    orderTotal: 0,
+    productTotal: 0,
+    monthlySales: 0,
+  }),
+  pendingPaymentCount: 0,
+  lowStockCount: 0,
+  recentOrders: [],
+  lowStockItems: [],
+};
+
+const dayMs = 24 * 60 * 60 * 1000;
+
+function formatLocalDate(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function toDateInputValue(date: Date) {
+  return formatLocalDate(date);
+}
+
+function fromDateInputValue(value: string) {
+  const [year, month, day] = value.split('-').map(Number);
+  return new Date(year, (month || 1) - 1, day || 1);
+}
+
+function shiftDate(date: Date, amount: number) {
+  return new Date(date.getTime() + amount * dayMs);
+}
+
+function getStartOfWeek(date: Date) {
+  const weekday = date.getDay();
+  const diff = weekday === 0 ? 6 : weekday - 1;
+  return shiftDate(date, -diff);
+}
+
+function getStartOfMonth(date: Date) {
+  return new Date(date.getFullYear(), date.getMonth(), 1);
+}
+
+function normalizeRange(range: DateRange | undefined) {
+  if (!range?.from && !range?.to) {
+    return undefined;
+  }
+
+  if (range?.from && range?.to && range.to < range.from) {
+    return { from: range.to, to: range.from };
+  }
+
+  return range;
+}
+
+function formatDateRangeLabel(start: string, end: string) {
+  if (!start && !end) return '';
+  if (start && end) return `${start} ~ ${end}`;
+  return start || end;
+}
+
 export default function ERPDashboard() {
   const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<TabType>('dashboard');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   const [difyOpen, setDifyOpen] = useState(false);
-  const [customers, setCustomers] = useState<CustomerRow[]>(initialCustomers);
-  const [orders, setOrders] = useState<OrderRow[]>(mockOrders);
+  const [customers, setCustomers] = useState<CustomerRow[]>([]);
+  const [orders, setOrders] = useState<OrderRow[]>([]);
+  const [orderKeyword, setOrderKeyword] = useState('');
+  const [orderStatusFilter, setOrderStatusFilter] = useState<'全部' | OrderRow['status']>('全部');
+  const [orderDateStart, setOrderDateStart] = useState('');
+  const [orderDateEnd, setOrderDateEnd] = useState('');
+  const [orderDateRange, setOrderDateRange] = useState<DateRange | undefined>();
+  const [dateRangeOpen, setDateRangeOpen] = useState(false);
+  const [dateRangeError, setDateRangeError] = useState('');
+  const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([]);
+  const [pageSize, setPageSize] = useState(10);
+  const [currentPage, setCurrentPage] = useState(1);
   const [createOrderOpen, setCreateOrderOpen] = useState(false);
   const [orderForm, setOrderForm] = useState<OrderFormState>({
-    customerId: initialCustomers[0].id,
-    orderDate: new Date().toISOString().slice(0, 10),
+    customerId: '',
+    orderDate: formatLocalDate(new Date()),
     productName: '',
     quantity: '1',
     price: '',
@@ -150,21 +226,9 @@ export default function ERPDashboard() {
   ]);
   const [chatInput, setChatInput] = useState('');
   const [chatLoading, setChatLoading] = useState(false);
-  const [overviewMetrics, setOverviewMetrics] = useState<DashboardOverviewMetrics>(
-    createDashboardOverviewMetrics({
-      customerTotal: 0,
-      orderTotal: 0,
-      productTotal: 0,
-      monthlySales: 0,
-    })
-  );
-
-  useEffect(() => {
-    const overrides = readOrderOverrides();
-    if (Object.keys(overrides).length === 0) return;
-
-    setOrders(prev => prev.map(order => mergeOrderRow(order, overrides[order.id])));
-  }, []);
+  const [dashboardOverview, setDashboardOverview] = useState<DashboardOverviewPayload>(emptyDashboardOverview);
+  const [apiErrors, setApiErrors] = useState<ApiLoadError[]>([]);
+  const [notificationOpen, setNotificationOpen] = useState(false);
 
   useEffect(() => {
     const tab = searchParams.get('tab');
@@ -174,22 +238,111 @@ export default function ERPDashboard() {
   }, [searchParams]);
 
   useEffect(() => {
-    const repository = createDashboardOverviewRepository({
-      customers,
-      orders,
-      products: mockInventory,
-      financeRecords: mockFinance,
+    async function loadData() {
+      const nextErrors: ApiLoadError[] = [];
+
+      async function fetchJson<T>(url: string, source: string): Promise<T | null> {
+        try {
+          const response = await fetch(url);
+
+          if (!response.ok) {
+            let message = `${source}接口请求失败`;
+
+            try {
+              const errorData = await response.json();
+              message = errorData.message ?? errorData.error ?? message;
+            } catch {
+              message = await response.text();
+            }
+
+            nextErrors.push({ source, message, status: response.status });
+            return null;
+          }
+
+          return await response.json();
+        } catch (error) {
+          nextErrors.push({
+            source,
+            message: error instanceof Error ? error.message : `${source}接口请求失败`,
+          });
+          return null;
+        }
+      }
+
+      const [customersData, ordersData, overviewData] = await Promise.all([
+        fetchJson<{ customers?: CustomerRow[] }>('/api/customers', '客户数据'),
+        fetchJson<{ orders?: OrderRow[] }>('/api/orders', '订单数据'),
+        fetchJson<DashboardOverviewPayload>('/api/dashboard/overview', '经营概览'),
+      ]);
+
+      if (customersData) {
+        setCustomers(customersData.customers ?? []);
+      }
+
+      if (ordersData) {
+        const overrides = readOrderOverrides();
+        const nextOrders = (ordersData.orders ?? []).map((order: OrderRow) => {
+          const mergedOrder = mergeOrderRow(order, overrides[order.id]);
+
+          return {
+            ...mergedOrder,
+            status: normalizeOrderStatus(mergedOrder.status),
+          };
+        });
+        setOrders(nextOrders);
+        setSelectedOrderIds([]);
+      }
+
+      if (overviewData) {
+        setDashboardOverview({
+          metrics: overviewData.metrics ?? emptyDashboardOverview.metrics,
+          pendingPaymentCount: overviewData.pendingPaymentCount ?? 0,
+          lowStockCount: overviewData.lowStockCount ?? 0,
+          recentOrders: overviewData.recentOrders ?? [],
+          lowStockItems: overviewData.lowStockItems ?? [],
+        });
+      }
+
+      setApiErrors(nextErrors);
+    }
+
+    void loadData();
+  }, []);
+
+  useEffect(() => {
+    if (!orderForm.customerId && customers.length > 0) {
+      setOrderForm(prev => ({ ...prev, customerId: customers[0].id }));
+    }
+  }, [customers, orderForm.customerId]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [orderKeyword, orderStatusFilter, orderDateStart, orderDateEnd, pageSize]);
+
+  useEffect(() => {
+    if (!orderDateStart && !orderDateEnd) {
+      setOrderDateRange(undefined);
+      return;
+    }
+
+    const nextRange = normalizeRange({
+      from: orderDateStart ? fromDateInputValue(orderDateStart) : undefined,
+      to: orderDateEnd ? fromDateInputValue(orderDateEnd) : undefined,
     });
 
-    repository.getMetrics().then(setOverviewMetrics);
-  }, [customers, orders]);
+    setOrderDateRange(nextRange);
+  }, [orderDateStart, orderDateEnd]);
 
   const handleOrderFormChange = (field: keyof OrderFormState, value: string) => {
     setOrderForm(prev => ({ ...prev, [field]: value }));
   };
 
   const handleCreateOrder = () => {
-    const customer = customers.find(item => item.id === orderForm.customerId)!;
+    const customer = customers.find(item => item.id === orderForm.customerId);
+    if (!customer) {
+      return;
+    }
+
     const quantity = Number(orderForm.quantity);
     const price = Number(orderForm.price);
     const totalAmount = quantity * price;
@@ -199,10 +352,11 @@ export default function ERPDashboard() {
     setOrders(prev => [
       {
         id: `ORD${nextNumber}`,
+        customerId: customer.id,
         orderNo: `ORD${orderDateText}${nextNumber}`,
         customer: customer.name,
         amount: totalAmount,
-        status: orderForm.status,
+        status: orderForm.status as OrderRow['status'],
         date: orderForm.orderDate,
         items: quantity,
         shippingAddress: orderForm.shippingAddress,
@@ -225,7 +379,7 @@ export default function ERPDashboard() {
     setCreateOrderOpen(false);
     setOrderForm({
       customerId: customers[0]?.id || '',
-      orderDate: new Date().toISOString().slice(0, 10),
+      orderDate: formatLocalDate(new Date()),
       productName: '',
       quantity: '1',
       price: '',
@@ -233,6 +387,168 @@ export default function ERPDashboard() {
       shippingAddress: '',
     });
   };
+
+  const filteredOrders = useMemo(() => {
+    const keyword = orderKeyword.trim().toLowerCase();
+
+    return orders.filter((order) => {
+      const matchesKeyword =
+        !keyword ||
+        order.orderNo.toLowerCase().includes(keyword) ||
+        order.customerId.toLowerCase().includes(keyword) ||
+        order.customer.toLowerCase().includes(keyword);
+
+      const matchesStatus =
+        orderStatusFilter === '全部' || order.status === orderStatusFilter;
+
+      const matchesStart = !orderDateStart || order.date >= orderDateStart;
+      const matchesEnd = !orderDateEnd || order.date <= orderDateEnd;
+
+      return matchesKeyword && matchesStatus && matchesStart && matchesEnd;
+    });
+  }, [orders, orderKeyword, orderStatusFilter, orderDateStart, orderDateEnd]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredOrders.length / pageSize));
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+  const paginatedOrders = useMemo(() => {
+    const start = (safeCurrentPage - 1) * pageSize;
+    return filteredOrders.slice(start, start + pageSize);
+  }, [filteredOrders, pageSize, safeCurrentPage]);
+  const selectedOrders = filteredOrders.filter((order) => selectedOrderIds.includes(order.id));
+  const allPageSelected =
+    paginatedOrders.length > 0 && paginatedOrders.every((order) => selectedOrderIds.includes(order.id));
+
+  const togglePageSelection = (checked: boolean) => {
+    if (checked) {
+      const merged = new Set([...selectedOrderIds, ...paginatedOrders.map((order) => order.id)]);
+      setSelectedOrderIds([...merged]);
+      return;
+    }
+
+    const pageIds = new Set(paginatedOrders.map((order) => order.id));
+    setSelectedOrderIds((prev) => prev.filter((id) => !pageIds.has(id)));
+  };
+
+  const toggleOrderSelection = (orderId: string, checked: boolean) => {
+    setSelectedOrderIds((prev) => {
+      if (checked) {
+        return [...new Set([...prev, orderId])];
+      }
+
+      return prev.filter((id) => id !== orderId);
+    });
+  };
+
+  const handleBatchStatusChange = (status: OrderRow['status']) => {
+    if (selectedOrderIds.length === 0) {
+      return;
+    }
+
+    const currentOverrides = readOrderOverrides();
+    const nextOverrides = { ...currentOverrides };
+
+    selectedOrderIds.forEach((orderId) => {
+      nextOverrides[orderId] = {
+        ...nextOverrides[orderId],
+        status,
+      };
+      writeOrderOverride(orderId, { status });
+    });
+
+    writeOrderOverrides(nextOverrides);
+    setOrders((prev) =>
+      prev.map((order) =>
+        selectedOrderIds.includes(order.id)
+          ? { ...order, status }
+          : order
+      )
+    );
+  };
+
+  const handleBatchExport = () => {
+    const exportRows = (selectedOrders.length > 0 ? selectedOrders : filteredOrders).map((order) => ({
+      订单号: order.orderNo,
+      客户ID: order.customerId,
+      客户名称: order.customer,
+      日期: order.date,
+      金额: order.amount,
+      状态: order.status,
+    }));
+
+    const csv = [
+      ['订单号', '客户ID', '客户名称', '日期', '金额', '状态'].join(','),
+      ...exportRows.map((row) =>
+        [row.订单号, row.客户ID, row.客户名称, row.日期, row.金额, row.状态]
+          .map((value) => `"${String(value).replaceAll('"', '""')}"`)
+          .join(',')
+      ),
+    ].join('\n');
+
+    const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8;' });
+    const url = window.URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `orders-${formatLocalDate(new Date())}.csv`;
+    anchor.click();
+    window.URL.revokeObjectURL(url);
+  };
+
+  const applyDateRange = (range: DateRange | undefined, errorMessage = '') => {
+    const normalized = normalizeRange(range);
+    setDateRangeError(errorMessage);
+    setOrderDateRange(normalized);
+    setOrderDateStart(normalized?.from ? toDateInputValue(normalized.from) : '');
+    setOrderDateEnd(normalized?.to ? toDateInputValue(normalized.to) : '');
+  };
+
+  const handleDateRangeSelect = (range: DateRange | undefined) => {
+    if (range?.from && range?.to && range.to < range.from) {
+      applyDateRange({ from: range.to, to: range.from }, '结束日期不能早于开始日期，已自动修正。');
+      return;
+    }
+
+    const normalized = normalizeRange(range);
+    applyDateRange(normalized, '');
+
+    if (normalized?.from && normalized?.to) {
+      setDateRangeOpen(false);
+    }
+  };
+
+  const handleQuickDateRange = (preset: 'today' | 'yesterday' | 'week' | 'month') => {
+    const today = new Date();
+    const current = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    let nextRange: DateRange;
+
+    switch (preset) {
+      case 'today':
+        nextRange = { from: current, to: current };
+        break;
+      case 'yesterday': {
+        const yesterday = shiftDate(current, -1);
+        nextRange = { from: yesterday, to: yesterday };
+        break;
+      }
+      case 'week':
+        nextRange = { from: getStartOfWeek(current), to: current };
+        break;
+      case 'month':
+        nextRange = { from: getStartOfMonth(current), to: current };
+        break;
+      default:
+        nextRange = { from: getStartOfWeek(current), to: current };
+        break;
+    }
+
+    applyDateRange(nextRange, '');
+    setDateRangeOpen(false);
+  };
+
+  const clearDateRange = () => {
+    applyDateRange(undefined, '');
+  };
+
+  const dateRangeLabel = formatDateRangeLabel(orderDateStart, orderDateEnd);
 
   const navItems = [
     { id: 'dashboard', label: '经营概览', icon: BarChart3 },
@@ -287,10 +603,52 @@ export default function ERPDashboard() {
     }
   };
 
-  const lowStockCount = mockInventory.filter(p => p.status === 'low').length;
-  const orderPendingPaymentCount = orders.filter(o => o.status === pendingOrderStatus).length;
+  const overviewMetrics: DashboardOverviewMetrics = dashboardOverview.metrics;
+  const lowStockCount = dashboardOverview.lowStockCount;
+  const orderPendingPaymentCount = dashboardOverview.pendingPaymentCount;
   const orderTotalAmount = Number(orderForm.quantity) * Number(orderForm.price || '0');
   const overviewCards: DashboardOverviewCard[] = createDashboardOverviewCards(overviewMetrics);
+  const notificationCount = orderPendingPaymentCount + lowStockCount + apiErrors.length;
+
+  const goToOrdersDetail = (status?: OrderRow['status']) => {
+    setActiveTab('orders');
+    setNotificationOpen(false);
+
+    if (status) {
+      setOrderStatusFilter(status);
+    }
+  };
+
+  const goToInventoryDetail = () => {
+    setActiveTab('inventory');
+    setNotificationOpen(false);
+  };
+
+  const notificationItems = [
+    ...(orderPendingPaymentCount > 0
+      ? [
+          {
+            key: 'pending-orders',
+            label: `有 ${orderPendingPaymentCount} 笔订单待收款`,
+            action: () => goToOrdersDetail(pendingOrderStatus),
+          },
+        ]
+      : []),
+    ...(lowStockCount > 0
+      ? [
+          {
+            key: 'low-stock',
+            label: `有 ${lowStockCount} 种产品库存不足`,
+            action: goToInventoryDetail,
+          },
+        ]
+      : []),
+    ...apiErrors.map((error, index) => ({
+      key: `api-error-${index}`,
+      label: `${error.source}加载失败`,
+      action: () => setNotificationOpen(false),
+    })),
+  ];
 
   return (
     <div className="min-h-screen bg-slate-100 flex">
@@ -359,14 +717,40 @@ export default function ERPDashboard() {
             {navItems.find(n => n.id === activeTab)?.label}
           </h2>
           <div className="flex items-center gap-4">
-            <Button variant="ghost" size="sm" className="relative">
-              <Bell className="w-5 h-5" />
-              {(lowStockCount > 0 || orderPendingPaymentCount > 0) && (
-                <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
-                  {lowStockCount + orderPendingPaymentCount}
-                </span>
-              )}
-            </Button>
+            <Popover open={notificationOpen} onOpenChange={setNotificationOpen}>
+              <PopoverTrigger asChild>
+                <Button variant="ghost" size="sm" className="relative">
+                  <Bell className="w-5 h-5" />
+                  {notificationCount > 0 && (
+                    <span className="absolute -top-1 -right-1 min-w-4 h-4 px-1 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
+                      {notificationCount}
+                    </span>
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="end" className="w-80 p-0">
+                <div className="border-b border-slate-100 px-4 py-3">
+                  <p className="text-sm font-semibold text-slate-800">通知概览</p>
+                  <p className="mt-1 text-xs text-slate-500">点击可跳转到对应详情页面</p>
+                </div>
+                <div className="p-2">
+                  {notificationItems.length > 0 ? (
+                    notificationItems.map((item) => (
+                      <button
+                        key={item.key}
+                        onClick={item.action}
+                        className="flex w-full items-start rounded-md px-3 py-2 text-left text-sm text-slate-700 transition-colors hover:bg-slate-50"
+                      >
+                        <span className="mt-1 mr-2 h-2 w-2 shrink-0 rounded-full bg-red-500" />
+                        <span>{item.label}</span>
+                      </button>
+                    ))
+                  ) : (
+                    <div className="px-3 py-6 text-center text-sm text-slate-500">暂无待处理通知</div>
+                  )}
+                </div>
+              </PopoverContent>
+            </Popover>
             <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center text-white text-sm font-medium">
               管
             </div>
@@ -375,6 +759,28 @@ export default function ERPDashboard() {
 
         {/* Content Area */}
         <div className="flex-1 p-6 overflow-auto">
+          {apiErrors.length > 0 && (
+            <Card className="mb-6 border-red-200 bg-red-50">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-red-700 flex items-center gap-2 text-base">
+                  <AlertCircle className="w-5 h-5" />
+                  数据加载失败
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2 text-sm text-red-700">
+                {apiErrors.map(error => (
+                  <div key={`${error.source}-${error.status ?? 'network'}`} className="rounded-md bg-white/70 px-3 py-2">
+                    <p className="font-medium">
+                      {error.source}
+                      {error.status ? ` · HTTP ${error.status}` : ''}
+                    </p>
+                    <p className="mt-1 break-words text-red-600">{error.message}</p>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
+
           {/* Dashboard */}
           {activeTab === 'dashboard' && (
             <div className="space-y-6">
@@ -382,9 +788,14 @@ export default function ERPDashboard() {
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 {overviewCards.map(card => {
                   const Icon = overviewCardIcons[card.icon];
+                  const targetTab = overviewCardTargets[card.key];
 
                   return (
-                    <Card key={card.key}>
+                    <Card
+                      key={card.key}
+                      className="cursor-pointer transition-all hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-md"
+                      onClick={() => setActiveTab(targetTab)}
+                    >
                       <CardContent className="pt-6">
                         <div className="flex items-center justify-between">
                           <div>
@@ -413,10 +824,20 @@ export default function ERPDashboard() {
                   <CardContent>
                     <div className="space-y-2">
                       {orderPendingPaymentCount > 0 && (
-                        <p className="text-orange-600">• 有 {orderPendingPaymentCount} 笔订单待收款</p>
+                        <button
+                          onClick={() => goToOrdersDetail(pendingOrderStatus)}
+                          className="block text-orange-600 transition-colors hover:text-orange-700 hover:underline"
+                        >
+                          • 有 {orderPendingPaymentCount} 笔订单待收款
+                        </button>
                       )}
                       {lowStockCount > 0 && (
-                        <p className="text-orange-600">• 有 {lowStockCount} 种产品库存不足</p>
+                        <button
+                          onClick={goToInventoryDetail}
+                          className="block text-orange-600 transition-colors hover:text-orange-700 hover:underline"
+                        >
+                          • 有 {lowStockCount} 种产品库存不足
+                        </button>
                       )}
                     </div>
                   </CardContent>
@@ -431,18 +852,21 @@ export default function ERPDashboard() {
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-3">
-                      {orders.slice(0, 5).map(order => (
+                      {dashboardOverview.recentOrders.map(order => (
                         <div key={order.id} className="flex items-center justify-between py-2 border-b border-slate-100 last:border-0">
                           <div>
                             <p className="font-medium text-slate-800">{order.orderNo}</p>
                             <p className="text-sm text-slate-500">{order.customer}</p>
                           </div>
                           <div className="text-right">
-                            <p className="font-medium">¥{order.amount.toLocaleString()}</p>
+                            <p className="font-medium">{formatCurrency(order.amount)}</p>
                             <Badge className={statusColors[order.status]}>{order.status}</Badge>
                           </div>
                         </div>
                       ))}
+                      {dashboardOverview.recentOrders.length === 0 && (
+                        <p className="text-slate-500 text-center py-4">暂无订单数据</p>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
@@ -453,7 +877,7 @@ export default function ERPDashboard() {
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-3">
-                      {mockInventory.filter(p => p.status === 'low').map(product => (
+                      {dashboardOverview.lowStockItems.map(product => (
                         <div key={product.id} className="flex items-center justify-between py-2 border-b border-slate-100 last:border-0">
                           <div>
                             <p className="font-medium text-slate-800">{product.name}</p>
@@ -465,7 +889,7 @@ export default function ERPDashboard() {
                           </div>
                         </div>
                       ))}
-                      {mockInventory.filter(p => p.status === 'low').length === 0 && (
+                      {dashboardOverview.lowStockItems.length === 0 && (
                         <p className="text-slate-500 text-center py-4">库存状态良好</p>
                       )}
                     </div>
@@ -520,14 +944,129 @@ export default function ERPDashboard() {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle>订单列表</CardTitle>
-                <Button onClick={() => setCreateOrderOpen(true)}>创建订单</Button>
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" onClick={handleBatchExport}>
+                    <Download className="mr-2 h-4 w-4" />
+                    批量导出
+                  </Button>
+                  <Button onClick={() => setCreateOrderOpen(true)}>创建订单</Button>
+                </div>
               </CardHeader>
-              <CardContent>
+              <CardContent className="space-y-4">
+                <div className="grid gap-3 lg:grid-cols-[2fr_1fr_1fr_auto]">
+                  <Input
+                    value={orderKeyword}
+                    onChange={(e) => setOrderKeyword(e.target.value)}
+                    placeholder="搜索订单号、客户 ID、客户名称"
+                  />
+                  <select
+                    value={orderStatusFilter}
+                    onChange={(e) => setOrderStatusFilter(e.target.value as '全部' | OrderRow['status'])}
+                    className="h-10 rounded-md border border-slate-200 bg-white px-3 text-sm outline-none"
+                  >
+                    <option value="全部">全部状态</option>
+                    {['待付款', '已付款', '已完成'].map((status) => (
+                      <option key={status} value={status}>
+                        {status}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="space-y-1">
+                    <Popover open={dateRangeOpen} onOpenChange={setDateRangeOpen}>
+                      <PopoverTrigger asChild>
+                        <button
+                          type="button"
+                          className={cn(
+                            'flex h-10 w-full items-center rounded-md border border-slate-200 bg-white px-3 text-sm outline-none transition-colors',
+                            dateRangeError ? 'border-amber-400 ring-2 ring-amber-100' : 'hover:border-slate-300'
+                          )}
+                        >
+                          <span className={cn('truncate text-left', dateRangeLabel ? 'text-slate-900' : 'text-slate-400')}>
+                            {dateRangeLabel || '选择日期范围'}
+                          </span>
+                          <div className="ml-auto flex items-center gap-2 pl-3">
+                            {dateRangeLabel && (
+                              <CircleX
+                                className="h-4 w-4 text-slate-400 transition-colors hover:text-slate-600"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  clearDateRange();
+                                }}
+                              />
+                            )}
+                            <CalendarDays className="h-4 w-4 text-slate-500" />
+                          </div>
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent align="start" className="w-auto p-0">
+                        <div className="flex flex-col gap-3 p-3">
+                          <div className="grid grid-cols-4 gap-2">
+                            <Button variant="outline" size="sm" onClick={() => handleQuickDateRange('today')}>今天</Button>
+                            <Button variant="outline" size="sm" onClick={() => handleQuickDateRange('yesterday')}>昨天</Button>
+                            <Button variant="outline" size="sm" onClick={() => handleQuickDateRange('week')}>本周</Button>
+                            <Button variant="outline" size="sm" onClick={() => handleQuickDateRange('month')}>本月</Button>
+                          </div>
+                          <Calendar
+                            mode="range"
+                            selected={orderDateRange}
+                            onSelect={handleDateRangeSelect}
+                            defaultMonth={orderDateRange?.from}
+                            locale={zhCN}
+                            classNames={{
+                              month_caption: 'flex items-center justify-center h-(--cell-size) w-full px-(--cell-size) text-sm font-medium',
+                            }}
+                            className="rounded-md border border-slate-100 bg-white"
+                          />
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                    {dateRangeError && (
+                      <p className="text-xs text-amber-600">{dateRangeError}</p>
+                    )}
+                  </div>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setOrderKeyword('');
+                      setOrderStatusFilter('全部');
+                      clearDateRange();
+                    }}
+                  >
+                    重置
+                  </Button>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
+                  <span className="text-slate-600">
+                    已选 {selectedOrderIds.length} 条 / 共 {filteredOrders.length} 条
+                  </span>
+                  {orderStatusOptions.map((status) => (
+                    <Button
+                      key={status}
+                      variant="outline"
+                      size="sm"
+                      disabled={selectedOrderIds.length === 0}
+                      onClick={() => handleBatchStatusChange(status)}
+                    >
+                      批量改为{status}
+                    </Button>
+                  ))}
+                </div>
+
                 <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead>
                       <tr className="border-b border-slate-200">
+                        <th className="w-12 py-3 px-4">
+                          <input
+                            type="checkbox"
+                            checked={allPageSelected}
+                            onChange={(e) => togglePageSelection(e.target.checked)}
+                          />
+                        </th>
                         <th className="text-left py-3 px-4 font-medium text-slate-600">订单号</th>
+                        <th className="text-left py-3 px-4 font-medium text-slate-600">客户ID</th>
                         <th className="text-left py-3 px-4 font-medium text-slate-600">客户</th>
                         <th className="text-left py-3 px-4 font-medium text-slate-600">日期</th>
                         <th className="text-left py-3 px-4 font-medium text-slate-600">金额</th>
@@ -536,12 +1075,20 @@ export default function ERPDashboard() {
                       </tr>
                     </thead>
                     <tbody>
-                      {orders.map(order => (
+                      {paginatedOrders.map(order => (
                         <tr key={order.id} className="border-b border-slate-100 hover:bg-slate-50">
+                          <td className="py-3 px-4">
+                            <input
+                              type="checkbox"
+                              checked={selectedOrderIds.includes(order.id)}
+                              onChange={(e) => toggleOrderSelection(order.id, e.target.checked)}
+                            />
+                          </td>
                           <td className="py-3 px-4 font-medium">{order.orderNo}</td>
+                          <td className="py-3 px-4 font-mono text-sm text-slate-600">{order.customerId}</td>
                           <td className="py-3 px-4 text-slate-600">{order.customer}</td>
                           <td className="py-3 px-4 text-slate-600">{order.date}</td>
-                          <td className="py-3 px-4">¥{order.amount.toLocaleString()}</td>
+                          <td className="py-3 px-4">{formatCurrency(order.amount)}</td>
                           <td className="py-3 px-4">
                             <Badge className={statusColors[order.status]}>{order.status}</Badge>
                           </td>
@@ -552,8 +1099,54 @@ export default function ERPDashboard() {
                           </td>
                         </tr>
                       ))}
+                      {paginatedOrders.length === 0 && (
+                        <tr>
+                          <td colSpan={8} className="px-4 py-10 text-center text-sm text-slate-500">
+                            当前筛选条件下没有匹配的订单
+                          </td>
+                        </tr>
+                      )}
                     </tbody>
                   </table>
+                </div>
+
+                <div className="flex flex-col gap-3 border-t border-slate-200 pt-4 lg:flex-row lg:items-center lg:justify-between">
+                  <div className="flex items-center gap-2 text-sm text-slate-600">
+                    <span>每页</span>
+                    <select
+                      value={pageSize}
+                      onChange={(e) => setPageSize(Number(e.target.value))}
+                      className="h-9 rounded-md border border-slate-200 bg-white px-2 text-sm outline-none"
+                    >
+                      {[10, 20, 50].map((size) => (
+                        <option key={size} value={size}>
+                          {size}
+                        </option>
+                      ))}
+                    </select>
+                    <span>条</span>
+                    <span className="ml-3">
+                      第 {safeCurrentPage} / {totalPages} 页
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={safeCurrentPage <= 1}
+                      onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                    >
+                      上一页
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={safeCurrentPage >= totalPages}
+                      onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                    >
+                      下一页
+                    </Button>
+                  </div>
                 </div>
               </CardContent>
             </Card>
