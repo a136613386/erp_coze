@@ -216,6 +216,10 @@ export default function ERPDashboard() {
     status: pendingOrderStatus,
     shippingAddress: '',
   });
+
+  // ‘false’：隐藏coze助手开关；‘true’：显示coze助手开关
+  const showErpAssistant = false;
+
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
     {
       id: '1',
@@ -1255,7 +1259,8 @@ export default function ERPDashboard() {
       </main>
 
       {/* AI Chat Button - ERP智能助手 */}
-      <button
+      {showErpAssistant && (
+        <button
         onClick={() => setChatOpen(true)}
         className={cn(
           'fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-full shadow-lg shadow-blue-500/30 flex items-center justify-center text-white hover:scale-110 transition-transform z-40',
@@ -1264,7 +1269,7 @@ export default function ERPDashboard() {
       >
         <Bot className="w-7 h-7" />
       </button>
-
+      )}
       {/* Dify Chat Button - 火箭图标 */}
       <button
         onClick={() => setDifyOpen(true)}
@@ -1372,7 +1377,7 @@ export default function ERPDashboard() {
       </Dialog>
 
       {/* AI Chat Panel */}
-      {chatOpen && (
+      {showErpAssistant && chatOpen && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-end justify-end p-6">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md h-[600px] flex flex-col animate-in slide-in-from-bottom-4 duration-300">
             {/* Chat Header */}
