@@ -13,7 +13,7 @@ interface DifyChatProps {
 
 export default function DifyChat({ onClose }: DifyChatProps) {
   const [messages, setMessages] = useState<Message[]>([
-    { role: 'assistant', content: '你好！我是Dify智能助手，有什么可以帮助你的吗？' }
+    { role: 'assistant', content: '你好！我是ERP智能助手，有什么可以帮助你的吗？' }
   ]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -72,8 +72,8 @@ export default function DifyChat({ onClose }: DifyChatProps) {
             </svg>
           </div>
           <div>
-            <div className="font-semibold text-sm">Dify 智能助手</div>
-            <div className="text-xs opacity-80">AI 通用对话</div>
+            <div className="font-semibold text-sm">ERP 智能助手</div>
+            <div className="text-xs opacity-80">ERP 通用对话</div>
           </div>
         </div>
         <button 
