@@ -5,19 +5,16 @@ import {
   AlertCircle,
   BarChart3,
   Bell,
-  Bot,
   ChevronLeft,
   ChevronRight,
   Eye,
   Package,
   RefreshCw,
   Rocket,
-  Send,
   Settings,
   ShoppingCart,
   Users,
   Wallet,
-  X,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -36,8 +33,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import type { CreateCustomerInput, CustomerListItem } from '@/lib/customer-management';
 import type {
@@ -48,13 +43,6 @@ import type {
 } from '@/lib/erp-client';
 
 type TabType = 'customers' | 'orders' | 'inventory' | 'finance' | 'dashboard';
-
-type ChatMessage = {
-  id: string;
-  role: 'user' | 'assistant';
-  content: string;
-  timestamp: string;
-};
 
 const navItems = [
   { id: 'dashboard', label: '经营概览', icon: BarChart3 },
@@ -97,18 +85,7 @@ function customerNumericId(customerId: string) {
 export default function ERPDashboard() {
   const [activeTab, setActiveTab] = useState<TabType>('dashboard');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [chatOpen, setChatOpen] = useState(false);
   const [difyOpen, setDifyOpen] = useState(false);
-  const [chatInput, setChatInput] = useState('');
-  const [chatLoading, setChatLoading] = useState(false);
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
-    {
-      id: '1',
-      role: 'assistant',
-      content: '您好，我是 ERP 智能助手，可以帮您查询客户、订单、库存、财务，并生成经营报表。',
-      timestamp: new Date().toISOString(),
-    },
-  ]);
 
   const [dashboard, setDashboard] = useState<DashboardOverviewStats>({
     customerCount: 0,
@@ -415,54 +392,6 @@ export default function ERPDashboard() {
     }
   };
 
-  const handleChat = async (event: React.FormEvent) => {
-    event.preventDefault();
-    const message = chatInput.trim();
-    if (!message || chatLoading) return;
-
-    const userMessage: ChatMessage = {
-      id: Date.now().toString(),
-      role: 'user',
-      content: message,
-      timestamp: new Date().toISOString(),
-    };
-
-    setChatMessages((prev) => [...prev, userMessage]);
-    setChatInput('');
-    setChatLoading(true);
-
-    try {
-      const response = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message }),
-      });
-
-      const text = await response.text();
-      setChatMessages((prev) => [
-        ...prev,
-        {
-          id: `${Date.now()}-assistant`,
-          role: 'assistant',
-          content: text || '暂未收到有效回复，请稍后重试。',
-          timestamp: new Date().toISOString(),
-        },
-      ]);
-    } catch {
-      setChatMessages((prev) => [
-        ...prev,
-        {
-          id: `${Date.now()}-assistant`,
-          role: 'assistant',
-          content: '服务暂时不可用，请稍后再试。',
-          timestamp: new Date().toISOString(),
-        },
-      ]);
-    } finally {
-      setChatLoading(false);
-    }
-  };
-
   return (
     <div className="flex min-h-screen bg-slate-100">
       <aside
@@ -475,9 +404,9 @@ export default function ERPDashboard() {
           {!sidebarCollapsed && (
             <div className="flex items-center gap-2">
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600">
-                <BarChart3 className="h-5 w-5" />
+                <Rocket className="h-5 w-5" />
               </div>
-              <span className="font-bold">ERP 系统</span>
+              <span className="font-bold">天商 ERP 系统</span>
             </div>
           )}
           <Button
@@ -1030,19 +959,9 @@ export default function ERPDashboard() {
       </Dialog>
 
       <button
-        onClick={() => setChatOpen(true)}
-        className={cn(
-          'fixed bottom-6 right-6 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-500/30 transition-transform hover:scale-110',
-          chatOpen && 'hidden'
-        )}
-      >
-        <Bot className="h-7 w-7" />
-      </button>
-
-      <button
         onClick={() => setDifyOpen(true)}
         className={cn(
-          'fixed bottom-24 right-6 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-orange-500 to-red-500 text-white shadow-lg shadow-orange-500/30 transition-transform hover:scale-110',
+          'fixed bottom-6 right-6 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-500/30 transition-transform hover:scale-110',
           difyOpen && 'hidden'
         )}
       >
@@ -1050,96 +969,6 @@ export default function ERPDashboard() {
       </button>
 
       {difyOpen && <DifyChat onClose={() => setDifyOpen(false)} />}
-
-      {chatOpen && (
-        <div className="fixed inset-0 z-50 flex items-end justify-end bg-black/50 p-6">
-          <div className="flex h-[600px] w-full max-w-md animate-in flex-col rounded-2xl bg-white shadow-2xl duration-300 slide-in-from-bottom-4">
-            <div className="flex h-16 shrink-0 items-center justify-between rounded-t-2xl bg-gradient-to-r from-blue-600 to-indigo-600 px-4">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/20">
-                  <Bot className="h-6 w-6 text-white" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-white">ERP 智能助手</h3>
-                  <p className="text-xs text-blue-100">在线</p>
-                </div>
-              </div>
-              <Button variant="ghost" size="sm" onClick={() => setChatOpen(false)} className="text-white hover:bg-white/20">
-                <X className="h-5 w-5" />
-              </Button>
-            </div>
-
-            <ScrollArea className="flex-1 p-4">
-              <div className="space-y-4">
-                {chatMessages.map((message) => (
-                  <div key={message.id} className={cn('flex gap-3', message.role === 'user' && 'flex-row-reverse')}>
-                    <div
-                      className={cn(
-                        'flex h-8 w-8 shrink-0 items-center justify-center rounded-xl',
-                        message.role === 'user' ? 'bg-emerald-500' : 'bg-blue-500'
-                      )}
-                    >
-                      {message.role === 'user' ? (
-                        <span className="text-xs font-medium text-white">我</span>
-                      ) : (
-                        <Bot className="h-4 w-4 text-white" />
-                      )}
-                    </div>
-                    <div
-                      className={cn(
-                        'max-w-[80%] rounded-2xl px-4 py-2',
-                        message.role === 'user' ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-700'
-                      )}
-                    >
-                      <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed">{message.content}</pre>
-                    </div>
-                  </div>
-                ))}
-                {chatLoading && (
-                  <div className="flex gap-3">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-blue-500">
-                      <Bot className="h-4 w-4 text-white" />
-                    </div>
-                    <div className="rounded-2xl bg-slate-100 px-4 py-3">
-                      <div className="flex gap-1">
-                        <span className="h-2 w-2 animate-bounce rounded-full bg-slate-400" style={{ animationDelay: '0ms' }} />
-                        <span className="h-2 w-2 animate-bounce rounded-full bg-slate-400" style={{ animationDelay: '150ms' }} />
-                        <span className="h-2 w-2 animate-bounce rounded-full bg-slate-400" style={{ animationDelay: '300ms' }} />
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </ScrollArea>
-
-            <div className="shrink-0 border-t border-slate-200 p-4">
-              <form onSubmit={handleChat} className="flex gap-2">
-                <Input
-                  value={chatInput}
-                  onChange={(event) => setChatInput(event.target.value)}
-                  placeholder="输入您的问题..."
-                  className="flex-1"
-                  disabled={chatLoading}
-                />
-                <Button type="submit" disabled={!chatInput.trim() || chatLoading}>
-                  <Send className="h-4 w-4" />
-                </Button>
-              </form>
-              <div className="mt-2 flex gap-2">
-                <Button variant="ghost" size="sm" className="text-xs" onClick={() => setChatInput('查看客户列表')}>
-                  客户列表
-                </Button>
-                <Button variant="ghost" size="sm" className="text-xs" onClick={() => setChatInput('查看订单')}>
-                  订单查询
-                </Button>
-                <Button variant="ghost" size="sm" className="text-xs" onClick={() => setChatInput('生成经营报表')}>
-                  经营报表
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

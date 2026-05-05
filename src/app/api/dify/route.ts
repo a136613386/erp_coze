@@ -2,16 +2,21 @@ import { NextRequest } from 'next/server';
 
 export const runtime = 'nodejs';
 
-const DIFY_HOST = 'http://192.168.218.150';
-const DIFY_API_URL = `${DIFY_HOST}/v1/chat-messages`;
-const DIFY_API_KEY = 'app-2WOJrmXm3RAvS4jMm8wsiNP9';
-const DIFY_USER = 'erp-user';
+const DIFY_API_URL =
+  process.env.DIFY_API_URL?.trim() || 'https://api.dify.ai/v1/chat-messages';
+const DIFY_API_KEY = process.env.DIFY_API_KEY?.trim() || '';
+const DIFY_USER = process.env.DIFY_USER?.trim() || 'erp-user';
+
 export async function POST(request: NextRequest) {
   try {
     const { message, conversation_id } = await request.json();
 
     if (!message || typeof message !== 'string') {
       return Response.json({ error: '消息不能为空' }, { status: 400 });
+    }
+
+    if (!DIFY_API_KEY) {
+      return Response.json({ error: 'DIFY_API_KEY 未配置' }, { status: 500 });
     }
 
     const response = await fetch(DIFY_API_URL, {

@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { Rocket, X } from 'lucide-react';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -13,100 +14,94 @@ interface DifyChatProps {
 
 export default function DifyChat({ onClose }: DifyChatProps) {
   const [messages, setMessages] = useState<Message[]>([
-    { role: 'assistant', content: '你好！我是ERP智能助手，有什么可以帮助你的吗？' }
+    {
+      role: 'assistant',
+      content: '您好，我是 ERP 智能客服助手，有什么可以帮助您的吗？',
+    },
   ]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
-
   useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages, loading]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!input.trim() || loading) return;
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    const message = input.trim();
+    if (!message || loading) return;
 
-    const userMessage = input.trim();
+    setMessages((prev) => [...prev, { role: 'user', content: message }]);
     setInput('');
     setLoading(true);
-
-    // 添加用户消息
-    setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
 
     try {
       const response = await fetch('/api/dify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: userMessage }),
+        body: JSON.stringify({ message }),
       });
 
-      const data = await response.json();
-      
-      setMessages(prev => [...prev, { 
-        role: 'assistant', 
-        content: data.answer || '抱歉，暂时无法回答' 
-      }]);
-    } catch (error) {
-      setMessages(prev => [...prev, { 
-        role: 'assistant', 
-        content: '抱歉，服务暂时不可用，请稍后重试。' 
-      }]);
-    }
+      const data = (await response.json()) as { answer?: string; error?: string };
 
-    setLoading(false);
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: 'assistant',
+          content: data.answer || data.error || '抱歉，暂时无法回答。',
+        },
+      ]);
+    } catch {
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: 'assistant',
+          content: '抱歉，服务暂时不可用，请稍后重试。',
+        },
+      ]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <div className="fixed bottom-20 right-4 w-80 h-96 bg-white rounded-lg shadow-2xl flex flex-col z-50 border border-gray-200">
-      {/* 头部 */}
-      <div className="bg-gradient-to-r from-orange-500 to-red-500 text-white p-3 rounded-t-lg flex justify-between items-center">
+    <div className="fixed bottom-20 right-4 z-50 flex h-96 w-80 flex-col rounded-lg border border-gray-200 bg-white shadow-2xl">
+      <div className="flex items-center justify-between rounded-t-lg bg-gradient-to-r from-orange-500 to-red-500 p-3 text-white">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
-            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
-            </svg>
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/20">
+            <Rocket className="h-4 w-4" />
           </div>
           <div>
-            <div className="font-semibold text-sm">ERP 智能助手</div>
-            <div className="text-xs opacity-80">ERP 通用对话</div>
+            <div className="text-sm font-semibold">ERP 智能客服助手</div>
+            <div className="text-xs opacity-80">天商 ERP 在线客服</div>
           </div>
         </div>
-        <button 
+        <button
           onClick={onClose}
-          className="w-7 h-7 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors"
+          className="flex h-7 w-7 items-center justify-center rounded-full bg-white/20 transition-colors hover:bg-white/30"
         >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-          </svg>
+          <X className="h-4 w-4" />
         </button>
       </div>
 
-      {/* 消息列表 */}
-      <div className="flex-1 overflow-y-auto p-3 space-y-3 bg-gray-50">
-        {messages.map((msg, index) => (
-          <div 
-            key={index} 
-            className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-          >
-            <div 
-              className={`max-w-[80%] px-3 py-2 rounded-lg text-sm ${
-                msg.role === 'user' 
-                  ? 'bg-orange-500 text-white' 
-                  : 'bg-white text-gray-800 border border-gray-200'
+      <div className="flex-1 space-y-3 overflow-y-auto bg-gray-50 p-3">
+        {messages.map((message, index) => (
+          <div key={`${message.role}-${index}`} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+            <div
+              className={`max-w-[80%] rounded-lg px-3 py-2 text-sm ${
+                message.role === 'user'
+                  ? 'bg-orange-500 text-white'
+                  : 'border border-gray-200 bg-white text-gray-800'
               }`}
             >
-              {msg.content}
+              {message.content}
             </div>
           </div>
         ))}
         {loading && (
           <div className="flex justify-start">
-            <div className="bg-white text-gray-500 px-3 py-2 rounded-lg border border-gray-200 text-sm">
+            <div className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-500">
               <span className="animate-pulse">思考中...</span>
             </div>
           </div>
@@ -114,21 +109,20 @@ export default function DifyChat({ onClose }: DifyChatProps) {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* 输入框 */}
-      <form onSubmit={handleSubmit} className="p-3 border-t border-gray-200 bg-white rounded-b-lg">
+      <form onSubmit={handleSubmit} className="rounded-b-lg border-t border-gray-200 bg-white p-3">
         <div className="flex gap-2">
           <input
             type="text"
             value={input}
-            onChange={(e) => setInput(e.target.value)}
+            onChange={(event) => setInput(event.target.value)}
             placeholder="输入问题..."
-            className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent text-sm"
+            className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-orange-500"
             disabled={loading}
           />
           <button
             type="submit"
             disabled={loading || !input.trim()}
-            className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
+            className="rounded-lg bg-orange-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-50"
           >
             发送
           </button>

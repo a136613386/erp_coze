@@ -4,12 +4,12 @@ import { Toaster } from '@/components/ui/sonner';
 import './globals.css';
 export const metadata: Metadata = {
   title: {
-    default: 'ERP 智能助手 | 小微企业管理系统',
-    template: '%s | ERP 智能助手',
+    default: '天商 ERP 系统 | ERP 智能客服助手',
+    template: '%s | 天商 ERP 系统',
   },
-  description: '面向小微企业的ERP教学演示系统，支持客户管理、订单管理、库存管理、财务管理等核心功能，以及AI智能助手对话交互。',
+  description: '天商 ERP 系统面向小微企业场景，支持客户、订单、库存、财务管理，并提供 ERP 智能客服助手对话交互。',
   keywords: [
-    'ERP系统',
+    '天商ERP系统',
     '企业管理',
     '客户管理',
     '订单管理',
@@ -18,10 +18,10 @@ export const metadata: Metadata = {
     '智能助手',
     '小微企业',
   ],
-  authors: [{ name: 'ERP Team' }],
+  authors: [{ name: 'Tianshang ERP Team' }],
   openGraph: {
-    title: 'ERP 智能助手 | 小微企业管理系统',
-    description: '面向小微企业的ERP教学演示系统',
+    title: '天商 ERP 系统 | ERP 智能客服助手',
+    description: '天商 ERP 系统面向小微企业场景的教学演示平台',
     locale: 'zh_CN',
     type: 'website',
   },
