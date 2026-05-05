@@ -323,7 +323,7 @@ export async function getDashboardData(): Promise<DashboardData> {
       (SELECT COUNT(*) FROM inventory_t) AS productCount,
       (SELECT COALESCE(SUM(amount), 0) FROM order_t) AS cumulativeSales,
       (SELECT COUNT(*) FROM order_t WHERE status = '待付款') AS pendingPaymentCount,
-      (SELECT COUNT(*) FROM inventory_t WHERE status = '????') AS lowStockCount
+      (SELECT COUNT(*) FROM inventory_t WHERE status = '库存不足') AS lowStockCount
   `);
 
   const recentOrders = await getOrders({ limit: 5 });
@@ -386,7 +386,7 @@ export async function getInventory(options?: { onlyLowStock?: boolean; limit?: n
   const params: unknown[] = [];
 
   if (options?.onlyLowStock) {
-    conditions.push("status = '????'");
+    conditions.push("status = '库存不足'");
   }
 
   const whereSql = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
@@ -410,7 +410,7 @@ export async function getInventory(options?: { onlyLowStock?: boolean; limit?: n
         status
       FROM inventory_t
       ${whereSql}
-      ORDER BY (status = '????') DESC, id DESC
+      ORDER BY (status = '库存不足') DESC, id DESC
       ${limitSql}
     `,
     params
