@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -11,9 +11,20 @@ interface DifyChatProps {
   onClose: () => void;
 }
 
+function formatAssistantMessage(content: string) {
+  return content
+    .replace(/\r\n/g, '\n')
+    .replace(/([：:])\s*(\d+\.)/g, '$1\n\n$2')
+    .replace(/(\d+\.)\s*/g, '\n$1 ')
+    .replace(/，\s*(交易日期|商品编码|分类|单位|当前库存|安全库存|金额|状态|客户名称|公司名称|联系电话)/g, '\n$1')
+    .replace(/(状态[：:][^\n]+)(\d+\.)/g, '$1\n\n$2')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
 export default function DifyChat({ onClose }: DifyChatProps) {
   const [messages, setMessages] = useState<Message[]>([
-    { role: 'assistant', content: '你好！我是Dify智能助手，有什么可以帮助你的吗？' }
+    { role: 'assistant', content: '你好！我是 Dify 智能助手，有什么可以帮助你的吗？' },
   ]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -27,16 +38,14 @@ export default function DifyChat({ onClose }: DifyChatProps) {
     scrollToBottom();
   }, [messages]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
     if (!input.trim() || loading) return;
 
     const userMessage = input.trim();
     setInput('');
     setLoading(true);
-
-    // 添加用户消息
-    setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
+    setMessages((prev) => [...prev, { role: 'user', content: userMessage }]);
 
     try {
       const response = await fetch('/api/dify', {
@@ -46,29 +55,33 @@ export default function DifyChat({ onClose }: DifyChatProps) {
       });
 
       const data = await response.json();
-      
-      setMessages(prev => [...prev, { 
-        role: 'assistant', 
-        content: data.answer || '抱歉，暂时无法回答' 
-      }]);
-    } catch (error) {
-      setMessages(prev => [...prev, { 
-        role: 'assistant', 
-        content: '抱歉，服务暂时不可用，请稍后重试。' 
-      }]);
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: 'assistant',
+          content: data.answer || '抱歉，暂时无法回答。',
+        },
+      ]);
+    } catch {
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: 'assistant',
+          content: '抱歉，服务暂时不可用，请稍后重试。',
+        },
+      ]);
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   };
 
   return (
     <div className="fixed bottom-20 right-4 w-80 h-96 bg-white rounded-lg shadow-2xl flex flex-col z-50 border border-gray-200">
-      {/* 头部 */}
       <div className="bg-gradient-to-r from-orange-500 to-red-500 text-white p-3 rounded-t-lg flex justify-between items-center">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
             <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" />
             </svg>
           </div>
           <div>
@@ -76,7 +89,7 @@ export default function DifyChat({ onClose }: DifyChatProps) {
             <div className="text-xs opacity-80">AI 通用对话</div>
           </div>
         </div>
-        <button 
+        <button
           onClick={onClose}
           className="w-7 h-7 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors"
         >
@@ -86,24 +99,30 @@ export default function DifyChat({ onClose }: DifyChatProps) {
         </button>
       </div>
 
-      {/* 消息列表 */}
       <div className="flex-1 overflow-y-auto p-3 space-y-3 bg-gray-50">
-        {messages.map((msg, index) => (
-          <div 
-            key={index} 
-            className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+        {messages.map((message, index) => (
+          <div
+            key={index}
+            className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
           >
-            <div 
-              className={`max-w-[80%] px-3 py-2 rounded-lg text-sm ${
-                msg.role === 'user' 
-                  ? 'bg-orange-500 text-white' 
+            <div
+              className={`max-w-[88%] px-3 py-2 rounded-lg text-sm ${
+                message.role === 'user'
+                  ? 'bg-orange-500 text-white'
                   : 'bg-white text-gray-800 border border-gray-200'
               }`}
             >
-              {msg.content}
+              {message.role === 'assistant' ? (
+                <pre className="whitespace-pre-wrap break-words font-sans leading-7">
+                  {formatAssistantMessage(message.content)}
+                </pre>
+              ) : (
+                <div className="whitespace-pre-wrap break-words leading-6">{message.content}</div>
+              )}
             </div>
           </div>
         ))}
+
         {loading && (
           <div className="flex justify-start">
             <div className="bg-white text-gray-500 px-3 py-2 rounded-lg border border-gray-200 text-sm">
@@ -111,16 +130,16 @@ export default function DifyChat({ onClose }: DifyChatProps) {
             </div>
           </div>
         )}
+
         <div ref={messagesEndRef} />
       </div>
 
-      {/* 输入框 */}
       <form onSubmit={handleSubmit} className="p-3 border-t border-gray-200 bg-white rounded-b-lg">
         <div className="flex gap-2">
           <input
             type="text"
             value={input}
-            onChange={(e) => setInput(e.target.value)}
+            onChange={(event) => setInput(event.target.value)}
             placeholder="输入问题..."
             className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent text-sm"
             disabled={loading}

@@ -1,5 +1,4 @@
 import { NextRequest } from 'next/server';
-import { Config, LLMClient, HeaderUtils } from 'coze-coding-dev-sdk';
 import { intentRecognition } from '@/lib/intentRecognition';
 import { queryService } from '@/lib/businessQuery';
 
