@@ -126,6 +126,17 @@ export default function ERPDashboard() {
     []
   );
 
+  useEffect(() => {
+    const savedDifyOpen = window.sessionStorage.getItem('erp:dify-open');
+    if (savedDifyOpen === 'true') {
+      setDifyOpen(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    window.sessionStorage.setItem('erp:dify-open', String(difyOpen));
+  }, [difyOpen]);
+
   const loadCustomers = useCallback(async (showErrorToast = true) => {
     try {
       setCustomerLoading(true);

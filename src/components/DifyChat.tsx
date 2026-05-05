@@ -35,6 +35,24 @@ export default function DifyChat({ onClose }: DifyChatProps) {
   };
 
   useEffect(() => {
+    const savedMessages = window.sessionStorage.getItem('erp:dify-messages');
+    if (savedMessages) {
+      try {
+        const parsed = JSON.parse(savedMessages) as Message[];
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setMessages(parsed);
+        }
+      } catch {
+        window.sessionStorage.removeItem('erp:dify-messages');
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    window.sessionStorage.setItem('erp:dify-messages', JSON.stringify(messages));
+  }, [messages]);
+
+  useEffect(() => {
     scrollToBottom();
   }, [messages]);
 
