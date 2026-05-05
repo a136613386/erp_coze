@@ -1,0 +1,53 @@
+INSERT INTO erp_db.customer_t (id, customer_name, company_name, phone, level, create_time, update_time) VALUES (11, 'CUST-001', 'Huaxing Trading Co., Ltd.', '13800000001', 'vip', '2026-04-29 13:32:34', '2026-04-29 13:32:34');
+INSERT INTO erp_db.customer_t (id, customer_name, company_name, phone, level, create_time, update_time) VALUES (12, 'CUST-002', 'Chenguang Office Equipment Co., Ltd.', '13800000002', '普通', '2026-04-29 13:32:34', '2026-04-29 13:32:34');
+INSERT INTO erp_db.customer_t (id, customer_name, company_name, phone, level, create_time, update_time) VALUES (13, 'CUST-003', 'Yuanhang Electronics Co., Ltd.', '13800000003', 'vip', '2026-04-29 13:32:34', '2026-04-29 13:32:34');
+INSERT INTO erp_db.customer_t (id, customer_name, company_name, phone, level, create_time, update_time) VALUES (14, 'CUST-004', 'Qiming Commerce Co., Ltd.', '13800000004', '普通', '2026-04-29 13:32:34', '2026-04-29 13:32:34');
+INSERT INTO erp_db.customer_t (id, customer_name, company_name, phone, level, create_time, update_time) VALUES (15, 'CUST-005', 'Boyuan Information Tech Co., Ltd.', '13800000005', '新客户', '2026-04-29 13:32:34', '2026-04-29 13:32:34');
+INSERT INTO erp_db.customer_t (id, customer_name, company_name, phone, level, create_time, update_time) VALUES (16, 'CUST-006', 'Jinqiao Industrial Co., Ltd.', '13800000006', '普通', '2026-04-29 13:32:34', '2026-04-29 13:32:34');
+INSERT INTO erp_db.customer_t (id, customer_name, company_name, phone, level, create_time, update_time) VALUES (17, 'CUST-007', 'Anda Supply Chain Co., Ltd.', '13800000007', 'vip', '2026-04-29 13:32:34', '2026-04-29 13:32:34');
+INSERT INTO erp_db.customer_t (id, customer_name, company_name, phone, level, create_time, update_time) VALUES (18, 'CUST-008', 'Hongxin Electric Sales Co., Ltd.', '13800000008', '新客户', '2026-04-29 13:32:34', '2026-04-29 13:32:34');
+INSERT INTO erp_db.customer_t (id, customer_name, company_name, phone, level, create_time, update_time) VALUES (19, 'CUST-009', 'Tengyue Industrial Equipment Co., Ltd.', '13800000009', '普通', '2026-04-29 13:32:34', '2026-04-29 13:32:34');
+INSERT INTO erp_db.customer_t (id, customer_name, company_name, phone, level, create_time, update_time) VALUES (20, 'CUST-010', 'Lianchuang Digital Services Co., Ltd.', '13800000010', '新客户', '2026-04-29 13:32:34', '2026-04-29 13:32:34');
+INSERT INTO erp_db.customer_t (id, customer_name, company_name, phone, level, create_time, update_time) VALUES (21, '测试客户A', '上海测试企业A', '13800000011', '普通', '2026-04-29 14:08:05', '2026-04-29 14:08:05');
+INSERT INTO erp_db.customer_t (id, customer_name, company_name, phone, level, create_time, update_time) VALUES (22, '法律知识库', '12331231', '12312312312', '新客户', '2026-04-29 14:23:23', '2026-04-29 14:23:23');
+INSERT INTO erp_db.customer_t (id, customer_name, company_name, phone, level, create_time, update_time) VALUES (23, '旅游助手', '1231231', '11123123212', 'vip', '2026-04-29 14:28:01', '2026-04-29 14:28:01');
+INSERT INTO erp_db.customer_t (id, customer_name, company_name, phone, level, create_time, update_time) VALUES (24, '王晓1', '王晓公司', '15616161615', '新客户', '2026-05-05 15:22:12', '2026-05-05 15:22:12');
+INSERT INTO erp_db.customer_t (id, customer_name, company_name, phone, level, create_time, update_time) VALUES (25, '马衡1', '马衡公司', '15616851561', '新客户', '2026-05-05 16:15:40', '2026-05-05 16:15:40');
+
+
+INSERT INTO erp_db.finance_t (id, customer_id, order_id, finance_date, type, counterparty, amount, payment_method, status, remark, create_time, update_time) VALUES (1, 21, 11, '2026-04-29', '收款', '测试客户A', 5200.00, '银行转账', '已确认', '接口测试收款', '2026-04-29 14:08:06', '2026-04-29 14:08:06');
+INSERT INTO erp_db.finance_t (id, customer_id, order_id, finance_date, type, counterparty, amount, payment_method, status, remark, create_time, update_time) VALUES (2, null, null, '2026-04-29', '付款', '测试供应商', 300.00, '微信', '已确认', '接口测试付款', '2026-04-29 14:08:06', '2026-04-29 14:08:06');
+INSERT INTO erp_db.finance_t (id, customer_id, order_id, finance_date, type, counterparty, amount, payment_method, status, remark, create_time, update_time) VALUES (3, 24, 13, '2026-05-05', '收款', '王晓', 20.00, '银行转账', '已确认', null, '2026-05-05 15:23:46', '2026-05-05 15:23:46');
+INSERT INTO erp_db.finance_t (id, customer_id, order_id, finance_date, type, counterparty, amount, payment_method, status, remark, create_time, update_time) VALUES (4, 25, 14, '2026-05-05', '收款', '马衡10111', 1000.00, '银行转账', '已确认', null, '2026-05-05 16:17:16', '2026-05-05 16:17:16');
+
+
+INSERT INTO erp_db.inventory_t (id, product_code, product_name, category, unit, current_stock, safe_stock, unit_price, cost, status, create_time, update_time) VALUES (1, 'IT001', 'Laptop', '电脑设备', '台', 25, 10, 5200.00, 4200.00, '正常', '2026-04-29 13:32:34', '2026-04-29 14:09:10');
+INSERT INTO erp_db.inventory_t (id, product_code, product_name, category, unit, current_stock, safe_stock, unit_price, cost, status, create_time, update_time) VALUES (2, 'IT002', 'Wireless Mouse', '电脑配件', '个', 80, 30, 120.00, 80.00, '正常', '2026-04-29 13:32:34', '2026-04-29 14:09:10');
+INSERT INTO erp_db.inventory_t (id, product_code, product_name, category, unit, current_stock, safe_stock, unit_price, cost, status, create_time, update_time) VALUES (3, 'IT003', 'Laser Printer', '办公设备', '台', 12, 5, 2600.00, 2200.00, '正常', '2026-04-29 13:32:34', '2026-04-29 14:09:10');
+INSERT INTO erp_db.inventory_t (id, product_code, product_name, category, unit, current_stock, safe_stock, unit_price, cost, status, create_time, update_time) VALUES (4, 'IT004', 'Monitor', '显示设备', '台', 18, 10, 1650.00, 1400.00, '正常', '2026-04-29 13:32:34', '2026-05-05 15:22:34');
+INSERT INTO erp_db.inventory_t (id, product_code, product_name, category, unit, current_stock, safe_stock, unit_price, cost, status, create_time, update_time) VALUES (5, 'IT005', 'Mechanical Keyboard', '电脑配件', '个', 45, 20, 320.00, 180.00, '正常', '2026-04-29 13:32:34', '2026-04-29 14:09:10');
+INSERT INTO erp_db.inventory_t (id, product_code, product_name, category, unit, current_stock, safe_stock, unit_price, cost, status, create_time, update_time) VALUES (6, 'IT006', 'Server Host', '服务器设备', '台', 5, 2, 22800.00, 20000.00, '正常', '2026-04-29 13:32:34', '2026-04-29 14:09:10');
+INSERT INTO erp_db.inventory_t (id, product_code, product_name, category, unit, current_stock, safe_stock, unit_price, cost, status, create_time, update_time) VALUES (7, 'IT007', 'Network Switch', '网络设备', '台', 15, 5, 2800.00, 2200.00, '正常', '2026-04-29 13:32:34', '2026-04-29 14:09:10');
+INSERT INTO erp_db.inventory_t (id, product_code, product_name, category, unit, current_stock, safe_stock, unit_price, cost, status, create_time, update_time) VALUES (8, 'IT008', 'SSD', '存储设备', '个', 4, 15, 760.00, 550.00, '库存不足', '2026-04-29 13:32:34', '2026-05-05 16:15:52');
+INSERT INTO erp_db.inventory_t (id, product_code, product_name, category, unit, current_stock, safe_stock, unit_price, cost, status, create_time, update_time) VALUES (9, 'IT009', 'Projector', '办公设备', '台', 8, 4, 4300.00, 3500.00, '正常', '2026-04-29 13:32:34', '2026-04-29 16:31:08');
+INSERT INTO erp_db.inventory_t (id, product_code, product_name, category, unit, current_stock, safe_stock, unit_price, cost, status, create_time, update_time) VALUES (10, 'IT010', 'Video Conference Terminal', '会议设备', '台', 6, 3, 9800.00, 7600.00, '正常', '2026-04-29 13:32:34', '2026-05-05 16:16:42');
+
+
+INSERT INTO erp_db.order_t (id, customer_id, order_no, deal_date, amount, status, create_time, update_time) VALUES (1, 11, 'ORD20260429001', '2026-04-01', 18000.00, '已完成', '2026-04-29 13:32:34', '2026-04-29 13:40:19');
+INSERT INTO erp_db.order_t (id, customer_id, order_no, deal_date, amount, status, create_time, update_time) VALUES (2, 12, 'ORD20260429002', '2026-04-03', 26500.00, '已发货', '2026-04-29 13:32:34', '2026-04-29 13:40:19');
+INSERT INTO erp_db.order_t (id, customer_id, order_no, deal_date, amount, status, create_time, update_time) VALUES (3, 13, 'ORD20260429003', '2026-04-05', 12800.00, '待付款', '2026-04-29 13:32:34', '2026-04-29 13:40:19');
+INSERT INTO erp_db.order_t (id, customer_id, order_no, deal_date, amount, status, create_time, update_time) VALUES (4, 14, 'ORD20260429004', '2026-04-08', 35000.00, '已付款', '2026-04-29 13:32:34', '2026-04-29 13:40:19');
+INSERT INTO erp_db.order_t (id, customer_id, order_no, deal_date, amount, status, create_time, update_time) VALUES (5, 15, 'ORD20260429005', '2026-04-10', 9200.00, '已完成', '2026-04-29 13:32:34', '2026-04-29 13:40:19');
+INSERT INTO erp_db.order_t (id, customer_id, order_no, deal_date, amount, status, create_time, update_time) VALUES (6, 16, 'ORD20260429006', '2026-04-12', 41000.00, '已发货', '2026-04-29 13:32:34', '2026-04-29 13:40:19');
+INSERT INTO erp_db.order_t (id, customer_id, order_no, deal_date, amount, status, create_time, update_time) VALUES (7, 17, 'ORD20260429007', '2026-04-15', 15600.00, '待付款', '2026-04-29 13:32:34', '2026-04-29 13:40:19');
+INSERT INTO erp_db.order_t (id, customer_id, order_no, deal_date, amount, status, create_time, update_time) VALUES (8, 18, 'ORD20260429008', '2026-04-18', 22800.00, '已付款', '2026-04-29 13:32:34', '2026-04-29 13:40:19');
+INSERT INTO erp_db.order_t (id, customer_id, order_no, deal_date, amount, status, create_time, update_time) VALUES (9, 19, 'ORD20260429009', '2026-04-22', 9100.00, '已取消', '2026-04-29 13:32:34', '2026-04-29 13:40:19');
+INSERT INTO erp_db.order_t (id, customer_id, order_no, deal_date, amount, status, create_time, update_time) VALUES (10, 20, 'ORD20260429010', '2026-04-25', 19500.00, '已完成', '2026-04-29 13:32:34', '2026-04-29 13:40:19');
+INSERT INTO erp_db.order_t (id, customer_id, order_no, deal_date, amount, status, create_time, update_time) VALUES (11, 21, 'ORD20260429140805280', '2026-04-29', 760.00, '待付款', '2026-04-29 14:08:05', '2026-04-29 14:08:05');
+INSERT INTO erp_db.order_t (id, customer_id, order_no, deal_date, amount, status, create_time, update_time) VALUES (12, 23, 'ORD20260429163108200', '2026-04-29', 4300.00, '待付款', '2026-04-29 16:31:08', '2026-04-29 16:31:08');
+INSERT INTO erp_db.order_t (id, customer_id, order_no, deal_date, amount, status, create_time, update_time) VALUES (13, 24, 'ORD20260505152314946', '2026-05-05', 9800.00, '待付款', '2026-05-05 15:23:14', '2026-05-05 15:23:14');
+INSERT INTO erp_db.order_t (id, customer_id, order_no, deal_date, amount, status, create_time, update_time) VALUES (14, 25, 'ORD20260505161552677', '2026-05-05', 760.00, '待付款', '2026-05-05 16:15:52', '2026-05-05 16:15:52');
+
+
+
+
