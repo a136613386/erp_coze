@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { 
   Users, ShoppingCart, Package, Wallet, BarChart3, 
   Settings, Bell, ChevronLeft, ChevronRight, Bot,
@@ -61,6 +61,7 @@ interface CustomerForm {
 interface Order {
   id: string;
   orderNo: string;
+  customerId?: string | null;
   customer: string;
   amount: number;
   status: OrderStatus;
@@ -141,6 +142,7 @@ export default function ERPDashboard() {
     level: '新客户',
   });
   const [customerFormError, setCustomerFormError] = useState('');
+  const [customerSaving, setCustomerSaving] = useState(false);
   const [orders, setOrders] = useState<Order[]>(mockOrders);
   const [orderDialogOpen, setOrderDialogOpen] = useState(false);
   const [orderForm, setOrderForm] = useState<OrderForm>({
@@ -151,6 +153,8 @@ export default function ERPDashboard() {
     items: '1',
   });
   const [orderFormError, setOrderFormError] = useState('');
+  const [orderSaving, setOrderSaving] = useState(false);
+  const [dataError, setDataError] = useState('');
   const [chatOpen, setChatOpen] = useState(false);
   const [difyOpen, setDifyOpen] = useState(false);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
@@ -172,6 +176,48 @@ export default function ERPDashboard() {
     { id: 'finance', label: '财务管理', icon: Wallet },
   ];
 
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadBusinessData() {
+      try {
+        const [customersResponse, ordersResponse] = await Promise.all([
+          fetch('/api/customers'),
+          fetch('/api/orders'),
+        ]);
+
+        if (!customersResponse.ok || !ordersResponse.ok) {
+          throw new Error('LOAD_FAILED');
+        }
+
+        const customersData = await customersResponse.json();
+        const ordersData = await ordersResponse.json();
+
+        if (cancelled) return;
+
+        const nextCustomers: Customer[] = customersData.customers ?? [];
+        setCustomers(nextCustomers);
+        setOrders(ordersData.orders ?? []);
+        setOrderForm(prev => ({
+          ...prev,
+          customerId: prev.customerId || nextCustomers[0]?.id || '',
+        }));
+        setDataError('');
+      } catch (error) {
+        console.error('Load business data error:', error);
+        if (!cancelled) {
+          setDataError('数据库数据加载失败，当前显示本地演示数据');
+        }
+      }
+    }
+
+    loadBusinessData();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const resetCustomerForm = () => {
     setCustomerForm({
       name: '',
@@ -187,8 +233,9 @@ export default function ERPDashboard() {
     if (!open) resetCustomerForm();
   };
 
-  const handleAddCustomer = (e: React.FormEvent) => {
+  const handleAddCustomer = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (customerSaving) return;
 
     const name = customerForm.name.trim();
     const company = customerForm.company.trim();
@@ -204,21 +251,40 @@ export default function ERPDashboard() {
       return;
     }
 
-    const nextNumber =
-      Math.max(...customers.map(customer => Number(customer.id.replace('C', ''))), 0) + 1;
-    const newCustomer: Customer = {
-      id: `C${String(nextNumber).padStart(3, '0')}`,
-      name,
-      company,
-      phone,
-      level: customerForm.level,
-      totalOrders: 0,
-      totalAmount: 0,
-    };
+    setCustomerSaving(true);
+    try {
+      const response = await fetch('/api/customers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name,
+          company,
+          phone,
+          level: customerForm.level,
+        }),
+      });
+      const result = await response.json();
 
-    setCustomers(prev => [...prev, newCustomer]);
-    setCustomerDialogOpen(false);
-    resetCustomerForm();
+      if (!response.ok) {
+        setCustomerFormError(result.error ?? '添加客户失败');
+        return;
+      }
+
+      const newCustomer: Customer = result.customer;
+      setCustomers(prev => [...prev, newCustomer]);
+      setOrderForm(prev => ({
+        ...prev,
+        customerId: prev.customerId || newCustomer.id,
+      }));
+      setCustomerDialogOpen(false);
+      resetCustomerForm();
+      setDataError('');
+    } catch (error) {
+      console.error('Add customer error:', error);
+      setCustomerFormError('添加客户失败，请检查数据库连接');
+    } finally {
+      setCustomerSaving(false);
+    }
   };
 
   const resetOrderForm = () => {
@@ -237,8 +303,9 @@ export default function ERPDashboard() {
     if (!open) resetOrderForm();
   };
 
-  const handleCreateOrder = (e: React.FormEvent) => {
+  const handleCreateOrder = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (orderSaving) return;
 
     const selectedCustomer = customers.find(customer => customer.id === orderForm.customerId);
     const amount = Number(orderForm.amount);
@@ -264,31 +331,41 @@ export default function ERPDashboard() {
       return;
     }
 
-    const nextNumber =
-      Math.max(...orders.map(order => Number(order.id.replace('ORD', ''))), 0) + 1;
-    const compactDate = orderForm.date.replaceAll('-', '');
-    const newOrder: Order = {
-      id: `ORD${String(nextNumber).padStart(3, '0')}`,
-      orderNo: `ORD${compactDate}${String(nextNumber).padStart(3, '0')}`,
-      customer: selectedCustomer.name,
-      amount,
-      status: orderForm.status,
-      date: orderForm.date,
-      items,
-    };
+    setOrderSaving(true);
+    try {
+      const response = await fetch('/api/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customerId: selectedCustomer.id,
+          amount,
+          status: orderForm.status,
+          date: orderForm.date,
+          items,
+        }),
+      });
+      const result = await response.json();
 
-    setOrders(prev => [newOrder, ...prev]);
-    setCustomers(prev => prev.map(customer => (
-      customer.id === selectedCustomer.id
-        ? {
-            ...customer,
-            totalOrders: customer.totalOrders + 1,
-            totalAmount: customer.totalAmount + amount,
-          }
-        : customer
-    )));
-    setOrderDialogOpen(false);
-    resetOrderForm();
+      if (!response.ok) {
+        setOrderFormError(result.error ?? '创建订单失败');
+        return;
+      }
+
+      const newOrder: Order = result.order;
+      const updatedCustomer: Customer = result.customer;
+      setOrders(prev => [newOrder, ...prev]);
+      setCustomers(prev => prev.map(customer => (
+        customer.id === updatedCustomer.id ? updatedCustomer : customer
+      )));
+      setOrderDialogOpen(false);
+      resetOrderForm();
+      setDataError('');
+    } catch (error) {
+      console.error('Create order error:', error);
+      setOrderFormError('创建订单失败，请检查数据库连接');
+    } finally {
+      setOrderSaving(false);
+    }
   };
 
   const handleChat = async (e: React.FormEvent) => {
@@ -422,6 +499,12 @@ export default function ERPDashboard() {
 
         {/* Content Area */}
         <div className="flex-1 p-6 overflow-auto">
+          {dataError && (
+            <div className="mb-4 rounded-lg border border-yellow-200 bg-yellow-50 px-4 py-3 text-sm text-yellow-700">
+              {dataError}
+            </div>
+          )}
+
           {/* Dashboard */}
           {activeTab === 'dashboard' && (
             <div className="space-y-6">
@@ -603,7 +686,7 @@ export default function ERPDashboard() {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle>订单列表</CardTitle>
-                <Button onClick={() => setOrderDialogOpen(true)}>
+                <Button onClick={() => setOrderDialogOpen(true)} disabled={customers.length === 0}>
                   <PlusCircle className="w-4 h-4" />
                   创建订单
                 </Button>
@@ -830,7 +913,9 @@ export default function ERPDashboard() {
               >
                 取消
               </Button>
-              <Button type="submit">保存客户</Button>
+              <Button type="submit" disabled={customerSaving}>
+                {customerSaving ? '保存中...' : '保存客户'}
+              </Button>
             </DialogFooter>
           </form>
         </DialogContent>
@@ -956,7 +1041,9 @@ export default function ERPDashboard() {
               >
                 取消
               </Button>
-              <Button type="submit">保存订单</Button>
+              <Button type="submit" disabled={orderSaving}>
+                {orderSaving ? '保存中...' : '保存订单'}
+              </Button>
             </DialogFooter>
           </form>
         </DialogContent>
