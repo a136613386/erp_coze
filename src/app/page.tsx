@@ -116,18 +116,18 @@ export default function ERPDashboard() {
     setChatLoading(true);
 
     try {
-      const response = await fetch('/api/chat', {
+      const response = await fetch('/api/dify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: chatInput.trim() }),
       });
 
-      const text = await response.text();
+      const data = await response.json();
 
       const assistantMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: text || '抱歉，我没有收到有效的回复',
+        content: data.answer || data.error || '抱歉，暂时无法回答',
         timestamp: new Date().toISOString(),
       };
 
