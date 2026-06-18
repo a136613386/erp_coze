@@ -75,7 +75,7 @@ console.log(`Clearing port ${PORT} before start.`);
 killPortIfListening(PORT);
 console.log(`Starting HTTP service on port ${PORT} for dev...`);
 
-const child = spawnCommand('pnpm', ['tsx', 'watch', 'src/server.ts'], {
+const child = spawnCommand('corepack', ['pnpm', 'tsx', 'watch', 'src/server.ts'], {
   stdio: 'inherit',
   env: { ...process.env, PORT },
 });

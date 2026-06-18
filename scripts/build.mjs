@@ -36,16 +36,17 @@ function run(command, args, label) {
 }
 
 await run(
-  'pnpm',
-  ['install', '--prefer-frozen-lockfile', '--prefer-offline', '--loglevel', 'debug', '--reporter=append-only'],
+  'corepack',
+  ['pnpm', 'install', '--prefer-frozen-lockfile', '--prefer-offline', '--loglevel', 'debug', '--reporter=append-only'],
   'Installing dependencies...'
 );
 
-await run('pnpm', ['next', 'build'], 'Building the Next.js project...');
+await run('corepack', ['pnpm', 'next', 'build'], 'Building the Next.js project...');
 
 await run(
-  'pnpm',
+  'corepack',
   [
+    'pnpm',
     'tsup',
     'src/server.ts',
     '--format',
