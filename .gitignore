@@ -53,6 +53,8 @@ report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 .yarn/build-state.yml
 .yarn/install-state.gz
 node-compile-cache/
+__pycache__/
+*.py[cod]
 
 # Editor directories and files
 .vscode/*
